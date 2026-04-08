@@ -1,0 +1,77 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Importer des recettes — Miam{% endblock %}
+
+{% block body %}
+    <h1 class="app-page-title">Importer des recettes</h1>
+    <p class="app-lead">Colle une URL Jow, importe un fichier CSV (modèle fourni), ou utilise un article du blog planification. Les recettes reprennent les mêmes champs qu’en saisie manuelle.</p>
+
+    <div class="link-row">
+        <a href="{{ path('app_recipe_index') }}">← Liste des recettes</a>
+        <a href="{{ path('app_planning_index') }}">Planification</a>
+        <a href="{{ path('app_recipe_new') }}">+ Nouvelle recette à la main</a>
+    </div>
+
+    <section class="card">
+        <h2 class="card__title">Fichier CSV</h2>
+        <p class="card__hint">
+            Télécharge le modèle&nbsp;
+            <a href="{{ app.request.basePath ~ '/recettes-import-modele.csv' }}" download>recettes-import-modele.csv</a>
+            (UTF-8, séparateur virgule). Colonnes obligatoires&nbsp;: <code>name</code>, <code>estimated_cost</code>, <code>main_ingredient</code>.
+            Valeurs <code>main_ingredient</code>&nbsp;: <code>poulet</code>, <code>porc</code>, <code>poisson</code>, <code>boeuf</code>, <code>vegetarien</code>, <code>pates</code>.
+            <code>seasonality</code>&nbsp;: <code>hiver</code>, <code>printemps</code>, <code>ete</code>, <code>automne</code>, <code>toute_annee</code> (défaut si vide).
+            <code>difficulty</code>&nbsp;: <code>Très facile</code>, <code>Facile</code>, <code>Moyen</code>, <code>Difficile</code> ou vide.
+            Colonne <code>ingredients</code>&nbsp;: lignes <code>quantité|unité|libellé</code> séparées par <code>;</code> (ex.&nbsp;<code>200|g|farine;2|pce|œufs</code>).
+            Les lignes déjà présentes (même nom et même URL source, ou sans URL si les deux sans URL) sont ignorées.
+        </p>
+        <form action="{{ path('app_recipe_import_csv') }}" method="post" enctype="multipart/form-data" class="csv-import">
+            <input type="hidden" name="_token" value="{{ csrf_token('import_csv') }}">
+            <div class="csv-import__file">
+                <label for="csv-file-input">Fichier .csv</label>
+                <input id="csv-file-input" type="file" name="csv_file" accept=".csv,text/csv" required>
+            </div>
+            <button type="submit" class="btn btn--primary">Importer le CSV</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2 class="card__title">Recette unitaire (URL Jow)</h2>
+        <p class="card__hint">Colle une URL du type <code>jow.fr/recipes/…</code> (paramètre <code>coversCount</code> pris en compte à l’import).</p>
+        <form action="{{ path('app_recipe_import_jow') }}" method="post" class="jow-import">
+            <input type="hidden" name="_token" value="{{ csrf_token('import_jow') }}">
+            <input
+                type="url"
+                name="jow_url"
+                required
+                placeholder="https://jow.fr/recipes/..."
+                aria-label="URL de la recette Jow"
+            >
+            <button type="submit" class="btn btn--primary">Importer</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2 class="card__title">Menu depuis le blog Jow</h2>
+        <p class="card__hint">
+            Articles du type planification mensuelle (ex.&nbsp;
+            <a href="https://jow.fr/blog/posts/votre-planification-recettes-du-mois-davril-2026" target="_blank" rel="noopener noreferrer">planification avril</a>)&nbsp;:
+            le parcours lit les blocs embarqués puis importe chaque recette. Les portions (équivalent <code>coversCount</code>) s’appliquent à toutes les URLs récupérées.
+        </p>
+        <form action="{{ path('app_recipe_import_jow_blog') }}" method="post" class="jow-blog-import">
+            <input type="hidden" name="_token" value="{{ csrf_token('import_jow_blog') }}">
+            <input
+                type="url"
+                name="jow_blog_url"
+                required
+                placeholder="https://jow.fr/blog/posts/…"
+                aria-label="URL de l’article blog Jow"
+                class="jow-blog-import__url"
+            >
+            <div class="jow-blog-import__covers">
+                <label for="jow-blog-covers">Portions</label>
+                <input id="jow-blog-covers" type="number" name="jow_blog_covers" min="1" max="20" value="4">
+            </div>
+            <button type="submit" class="btn btn--primary jow-blog-import__submit">Importer le menu</button>
+        </form>
+    </section>
+{% endblock %}

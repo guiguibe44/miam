@@ -1,0 +1,148 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Ingrédients — Miam{% endblock %}
+
+{% block body %}
+    <h1 class="app-page-title">Ingrédients</h1>
+    <p class="app-lead">Recherche, tri, classement en masse et fusion de doublons.</p>
+
+    <section class="card">
+        <form method="get" class="stack-form">
+            <div class="form-grid">
+                <div>
+                    <label for="ingredient-q">Recherche</label>
+                    <input id="ingredient-q" type="search" name="q" value="{{ filters.q }}" placeholder="Ex. tomate">
+                </div>
+                <div>
+                    <label for="ingredient-category">Catégorie</label>
+                    <select id="ingredient-category" name="category">
+                        <option value="">Toutes</option>
+                        {% for label, value in categoryChoices %}
+                            <option value="{{ value }}" {{ filters.category == value ? 'selected' : '' }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="ingredient-sort">Trier par</label>
+                    <select id="ingredient-sort" name="sort">
+                        <option value="name" {{ filters.sort == 'name' ? 'selected' : '' }}>Nom</option>
+                        <option value="category" {{ filters.sort == 'category' ? 'selected' : '' }}>Catégorie</option>
+                        <option value="usage" {{ filters.sort == 'usage' ? 'selected' : '' }}>Utilisation</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="ingredient-dir">Ordre</label>
+                    <select id="ingredient-dir" name="dir">
+                        <option value="ASC" {{ filters.dir == 'ASC' ? 'selected' : '' }}>Croissant</option>
+                        <option value="DESC" {{ filters.dir == 'DESC' ? 'selected' : '' }}>Décroissant</option>
+                    </select>
+                </div>
+            </div>
+            <p class="filter-actions">
+                <button type="submit" class="btn btn--primary">Appliquer</button>
+                <a href="{{ path('app_ingredient_index') }}" class="btn btn--secondary">Réinitialiser</a>
+            </p>
+        </form>
+    </section>
+
+    {% if duplicateSuggestions is not empty %}
+        <section class="card">
+            <h2 class="card__title">Fusions recommandées</h2>
+            <p class="card__hint">Doublons probables détectés automatiquement (accents, pluriels, casse).</p>
+            <div class="ingredient-duplicates">
+                {% for suggestion in duplicateSuggestions %}
+                    <form method="post" action="{{ path('app_ingredient_merge') }}" class="ingredient-duplicate-item">
+                        <input type="hidden" name="_token" value="{{ csrf_token('ingredient_mass') }}">
+                        {% for duplicate in suggestion.duplicates %}
+                            <input type="hidden" name="selected_ids[]" value="{{ duplicate.id }}">
+                        {% endfor %}
+                        <input type="hidden" name="target_id" value="{{ suggestion.target.id }}">
+                        <p>
+                            Fusionner
+                            <strong>{{ suggestion.duplicates|map(i => i.name)|join(', ') }}</strong>
+                            vers
+                            <strong>{{ suggestion.target.name }}</strong>
+                        </p>
+                        <button type="submit" class="btn btn--ghost">Fusionner cette suggestion</button>
+                    </form>
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+
+    <form method="post" class="card ingredient-admin-card">
+        <input type="hidden" name="_token" value="{{ csrf_token('ingredient_mass') }}">
+
+        <div class="ingredient-mass-actions">
+            <div class="ingredient-mass-actions__block">
+                <label for="bulk-category">Classer la sélection</label>
+                <select id="bulk-category" name="bulk_category">
+                    <option value="">Choisir une catégorie</option>
+                    {% for label, value in categoryChoices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn--ghost" formaction="{{ path('app_ingredient_bulk_classify') }}">Classer</button>
+            </div>
+            <div class="ingredient-mass-actions__block">
+                <label for="merge-target">Fusionner vers</label>
+                <select id="merge-target" name="target_id">
+                    <option value="">Choisir l’ingrédient cible</option>
+                    {% for row in rows %}
+                        <option value="{{ row.ingredient.id }}">{{ row.ingredient.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn--ghost" formaction="{{ path('app_ingredient_merge') }}">Fusionner</button>
+            </div>
+        </div>
+
+        <div class="shopping-list-card">
+            <table class="shopping-list-table">
+                <thead>
+                    <tr>
+                        <th scope="col">
+                            <input type="checkbox" data-check-all>
+                        </th>
+                        <th scope="col">Nom</th>
+                        <th scope="col">Catégorie</th>
+                        <th scope="col">Unité par défaut</th>
+                        <th scope="col">Utilisation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" name="selected_ids[]" value="{{ row.ingredient.id }}" data-check-item>
+                            </td>
+                            <td>{{ row.ingredient.name }}</td>
+                            <td>{{ categoryLabelsByValue[row.ingredient.category] ?? 'Autre' }}</td>
+                            <td>{{ row.ingredient.defaultUnit }}</td>
+                            <td>{{ row.usageCount }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="muted">Aucun ingrédient trouvé.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+{% endblock %}
+
+{% block body_javascripts %}
+    <script>
+        (function () {
+            var checkAll = document.querySelector('[data-check-all]');
+            if (!checkAll) {
+                return;
+            }
+            checkAll.addEventListener('change', function () {
+                document.querySelectorAll('[data-check-item]').forEach(function (el) {
+                    el.checked = checkAll.checked;
+                });
+            });
+        })();
+    </script>
+{% endblock %}

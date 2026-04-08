@@ -1,0 +1,92 @@
+{# Fragment AJAX + rendu initial : zone principale liste / pagination #}
+{% if pagination.total == 0 %}
+    <div class="empty-state">
+        {% if hasActiveFilters %}
+            Aucune recette ne correspond à ces filtres. Élargis les critères ou <a href="{{ path('app_recipe_index') }}">réinitialise</a>.
+        {% else %}
+            Aucune recette pour l’instant.
+            <a href="{{ path('app_recipe_import') }}">Importer depuis Jow</a>
+            ou <a href="{{ path('app_recipe_new') }}">créer une recette</a>.
+        {% endif %}
+    </div>
+{% else %}
+    <p class="pagination-summary muted">{{ pagination.total }} recette(s) · page {{ pagination.page }} / {{ pagination.totalPages }}</p>
+    <div class="recipe-grid">
+        {% for recipe in recipes %}
+            <article class="recipe-card">
+                <div class="recipe-card__media">
+                    {% if recipe.imageUrl %}
+                        <img src="{{ recipe.imageUrl }}" alt="">
+                    {% endif %}
+                </div>
+                <div class="recipe-card__body">
+                    <h3 class="recipe-card__title">{{ recipe.name }}</h3>
+                    <div class="recipe-card__meta">
+                        <span class="chip">Prép. {{ recipe.preparationTimeMinutes }} min</span>
+                        <span class="chip">Cuiss. {{ recipe.cookTimeMinutes }} min</span>
+                        <span class="chip chip--accent">Total {{ recipe.totalTimeMinutes }} min</span>
+                        {% if recipe.caloriesPerPortion %}
+                            <span class="chip">{{ recipe.caloriesPerPortion }} kcal</span>
+                        {% endif %}
+                        {% if recipe.difficulty %}
+                            <span class="chip">{{ recipe.difficulty }}</span>
+                        {% endif %}
+                    </div>
+                    <p class="recipe-card__price">
+                        <strong>{{ recipe.estimatedCost }} €</strong> / portion
+                        {% if recipe.portionPriceLabel %}
+                            <br><span class="muted">{{ recipe.portionPriceLabel }}</span>
+                        {% endif %}
+                    </p>
+                    <div class="recipe-card__meta">
+                        <span class="chip">{{ recipe.mainIngredient }}</span>
+                        <span class="chip">{{ recipe.seasonality }}</span>
+                    </div>
+                    <div class="recipe-card__actions">
+                        {% if recipe.sourceUrl %}
+                            <a href="{{ recipe.sourceUrl }}" class="btn btn--secondary" target="_blank" rel="noopener noreferrer">Source</a>
+                        {% endif %}
+                        <a href="{{ path('app_recipe_edit', {id: recipe.id}) }}" class="btn btn--primary">Modifier</a>
+                        <form action="{{ path('app_recipe_delete', {id: recipe.id}) }}" method="post" onsubmit="return confirm('Supprimer cette recette ?');">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete_' ~ recipe.id) }}">
+                            <button type="submit" class="btn btn--danger">Supprimer</button>
+                        </form>
+                    </div>
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+
+    {% if pagination.totalPages > 1 %}
+        {% set p_start = max(1, pagination.page - 2) %}
+        {% set p_end = min(pagination.totalPages, pagination.page + 2) %}
+        <nav class="pagination" aria-label="Pagination des recettes">
+            {% if pagination.page > 1 %}
+                {% set prev_q = pagination.page == 2 ? filter_query : filter_query|merge({ page: pagination.page - 1 }) %}
+                <a class="btn btn--secondary" rel="prev" href="{{ path('app_recipe_index', prev_q) }}">Précédent</a>
+            {% else %}
+                <span class="btn btn--secondary pagination__disabled" aria-disabled="true">Précédent</span>
+            {% endif %}
+
+            <ul class="pagination__pages">
+                {% for p in p_start..p_end %}
+                    <li>
+                        {% if p == pagination.page %}
+                            <span class="pagination__current" aria-current="page">{{ p }}</span>
+                        {% elseif p == 1 %}
+                            <a href="{{ path('app_recipe_index', filter_query) }}">{{ p }}</a>
+                        {% else %}
+                            <a href="{{ path('app_recipe_index', filter_query|merge({ page: p })) }}">{{ p }}</a>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+
+            {% if pagination.page < pagination.totalPages %}
+                <a class="btn btn--secondary" rel="next" href="{{ path('app_recipe_index', filter_query|merge({ page: pagination.page + 1 })) }}">Suivant</a>
+            {% else %}
+                <span class="btn btn--secondary pagination__disabled" aria-disabled="true">Suivant</span>
+            {% endif %}
+        </nav>
+    {% endif %}
+{% endif %}

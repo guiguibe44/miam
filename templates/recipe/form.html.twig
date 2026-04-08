@@ -1,0 +1,117 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ pageTitle }} — Miam{% endblock %}
+
+{% block body %}
+    <h1 class="app-page-title">{{ pageTitle }}</h1>
+    <div class="link-row">
+        <a href="{{ path('app_recipe_index') }}">← Recettes</a>
+        <a href="{{ path('app_planning_index') }}">Planification</a>
+    </div>
+
+    <div class="card">
+        {{ form_start(form, { attr: { class: 'stack-form' } }) }}
+            {{ form_row(form.name) }}
+            <div class="form-grid">
+                <div>{{ form_row(form.preparationTimeMinutes) }}</div>
+                <div>{{ form_row(form.cookTimeMinutes) }}</div>
+            </div>
+            <div class="form-grid">
+                <div>{{ form_row(form.estimatedCost) }}</div>
+                <div>{{ form_row(form.portionPriceLabel) }}</div>
+            </div>
+            <div class="form-grid">
+                <div>{{ form_row(form.difficulty) }}</div>
+                <div>{{ form_row(form.caloriesPerPortion) }}</div>
+            </div>
+            <div class="form-grid">
+                <div>{{ form_row(form.mainIngredient) }}</div>
+                <div>{{ form_row(form.seasonality) }}</div>
+            </div>
+            {{ form_row(form.imageUrl) }}
+            {{ form_row(form.imageFile) }}
+            {{ form_row(form.sourceUrl) }}
+
+            <h2 class="section-title">Ingrédients</h2>
+            <p class="card__hint">Une ligne par ingrédient. Une ligne vide est ignorée à l’enregistrement.</p>
+
+            <div id="recipe-ingredients-wrapper" data-index="{{ form.recipeIngredients|length }}">
+                {% for line in form.recipeIngredients %}
+                    <div class="ingredient-row">
+                        <div>{{ form_row(line.ingredientName) }}</div>
+                        <div>{{ form_row(line.quantity) }}</div>
+                        <div>{{ form_row(line.unit) }}</div>
+                        <div>{{ form_row(line.category) }}</div>
+                        <button type="button" class="btn btn--ghost remove-ingredient" aria-label="Retirer la ligne">Retirer</button>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <p>
+                <button type="button" id="recipe-add-ingredient" class="btn btn--secondary">+ Ajouter un ingrédient</button>
+            </p>
+
+            <template id="ingredient-row-prototype">
+                <div class="ingredient-row">
+                    {{ form_row(form.recipeIngredients.vars.prototype.ingredientName) }}
+                    {{ form_row(form.recipeIngredients.vars.prototype.quantity) }}
+                    {{ form_row(form.recipeIngredients.vars.prototype.unit) }}
+                    {{ form_row(form.recipeIngredients.vars.prototype.category) }}
+                    <button type="button" class="btn btn--ghost remove-ingredient" aria-label="Retirer la ligne">Retirer</button>
+                </div>
+            </template>
+
+            <p style="margin-top: 1.25rem;">
+                <button type="submit" class="btn btn--primary btn--block">Enregistrer</button>
+            </p>
+        {{ form_end(form) }}
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+{% endblock %}
+
+{% block body_javascripts %}
+    <script>
+        (function () {
+            function initIngredientRows() {
+                var wrapper = document.getElementById('recipe-ingredients-wrapper');
+                var addBtn = document.getElementById('recipe-add-ingredient');
+                var tpl = document.getElementById('ingredient-row-prototype');
+                if (!wrapper || !addBtn || !tpl) {
+                    return;
+                }
+
+                function bindRemove(row) {
+                    var btn = row.querySelector('.remove-ingredient');
+                    if (!btn) {
+                        return;
+                    }
+                    btn.addEventListener('click', function () {
+                        row.remove();
+                    });
+                }
+
+                wrapper.querySelectorAll('.ingredient-row').forEach(bindRemove);
+
+                addBtn.addEventListener('click', function () {
+                    var index = parseInt(wrapper.getAttribute('data-index') || '0', 10);
+                    var html = tpl.innerHTML.replace(/__name__/g, String(index));
+                    wrapper.insertAdjacentHTML('beforeend', html);
+                    wrapper.setAttribute('data-index', String(index + 1));
+                    var rows = wrapper.querySelectorAll('.ingredient-row');
+                    if (rows.length) {
+                        bindRemove(rows[rows.length - 1]);
+                    }
+                });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initIngredientRows);
+            } else {
+                initIngredientRows();
+            }
+        })();
+    </script>
+{% endblock %}

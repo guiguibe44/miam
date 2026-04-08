@@ -1,0 +1,103 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Planifications — Miam{% endblock %}
+
+{% block body %}
+    <div class="planning-list-page">
+        <h1 class="app-page-title">Planifications</h1>
+
+        <div class="planning-home-layout">
+            <section class="card planning-history-card">
+                <div class="planning-history-card__header">
+                    <h2 class="card__title">Historique des semaines planifiées</h2>
+                    <a
+                        class="btn btn--primary"
+                        href="{{ path('app_planning_configure', {
+                            planning_filter: {
+                                periodStart: newWeekStart|date('Y-m-d'),
+                                periodEnd: newWeekEnd|date('Y-m-d'),
+                                days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+                                mealTypes: ['midi', 'soir'],
+                            },
+                            planning_show_slots: 1,
+                        }) }}"
+                    >
+                        <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-plus"></use></svg>
+                        Créer une nouvelle semaine
+                    </a>
+                </div>
+                {% if planningHistory is empty %}
+                    <p class="muted">Aucune semaine enregistrée pour le moment. Commence par créer et enregistrer une planification.</p>
+                {% else %}
+                    <ul class="planning-history-list">
+                        {% for week in planningHistory %}
+                            <li class="planning-history-item">
+                                <div>
+                                    <strong>Semaine du {{ week.weekStart|date('d/m/Y') }} au {{ week.weekEnd|date('d/m/Y') }}</strong>
+                                    <p class="muted planning-history-item__meta">
+                                        {{ week.assignedSlots }} repas avec recette enregistrée
+                                        {% if week.totalSlots > 0 %}
+                                            sur {{ week.totalSlots }} créneaux.
+                                        {% else %}
+                                            .
+                                        {% endif %}
+                                    </p>
+                                </div>
+                                <a
+                                    class="btn btn--secondary"
+                                    href="{{ path('app_planning_configure', {
+                                        planning_filter: {
+                                            periodStart: week.weekStart|date('Y-m-d'),
+                                            periodEnd: week.weekEnd|date('Y-m-d'),
+                                            days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+                                            mealTypes: ['midi', 'soir'],
+                                        },
+                                        planning_show_slots: 1,
+                                    }) }}"
+                                >
+                                    <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-calendar"></use></svg>
+                                    Ouvrir
+                                </a>
+                                <form method="post" action="{{ path('app_planning_history_duplicate', { weekStart: week.weekStart|date('Y-m-d') }) }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('planning_duplicate_' ~ week.weekStart|date('Y-m-d')) }}">
+                                    <button type="submit" class="btn btn--primary">
+                                        <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-copy"></use></svg>
+                                        Dupliquer
+                                    </button>
+                                </form>
+                                <form method="post" action="{{ path('app_planning_history_delete', { weekStart: week.weekStart|date('Y-m-d') }) }}">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('planning_delete_' ~ week.weekStart|date('Y-m-d')) }}">
+                                    <button type="submit" class="btn btn--danger" onclick="return confirm('Supprimer cette planification ?');">
+                                        <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-trash"></use></svg>
+                                        Supprimer
+                                    </button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </section>
+
+            <aside class="card planning-next-card">
+                <h2 class="card__title">Prochaines recettes</h2>
+                {% if nextMeals is empty %}
+                    <p class="muted">Aucune recette planifiée à venir.</p>
+                {% else %}
+                    <ul class="planning-next-list">
+                        {% for meal in nextMeals %}
+                            <li class="planning-next-item">
+                                {% if meal.recipeImageUrl %}
+                                    <img src="{{ meal.recipeImageUrl }}" alt="" loading="lazy" width="52" height="52">
+                                {% endif %}
+                                <div>
+                                    <strong><a href="{{ path('app_recipe_edit', { id: meal.recipeId }) }}">{{ meal.recipeName }}</a></strong>
+                                    <p class="muted">{{ meal.servedOn|date('d/m/Y') }} · {{ meal.mealLabel }}</p>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </aside>
+        </div>
+    </div>
+{% endblock %}

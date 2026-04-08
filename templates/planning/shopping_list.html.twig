@@ -1,0 +1,108 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Liste des courses — Miam{% endblock %}
+
+{% block body %}
+    <div class="shopping-page">
+        <h1 class="app-page-title">Liste des courses</h1>
+        <p class="app-lead shopping-page__lead">
+            Ingrédients agrégés pour les recettes <strong>déjà enregistrées</strong> en planification
+            du <strong>{{ periodStart|date('d/m/Y') }}</strong> au <strong>{{ periodEnd|date('d/m/Y') }}</strong>.
+        </p>
+
+        <div class="link-row">
+            <a href="{{ path('app_planning_configure', {
+                planning_show_slots: '1',
+                planning_filter: {
+                    periodStart: periodStart|date('Y-m-d'),
+                    periodEnd: periodEnd|date('Y-m-d'),
+                },
+            }) }}">← Retour à la planification</a>
+        </div>
+
+        {% if lines is empty %}
+            <div class="empty-state shopping-page__empty">
+                Aucun ingrédient sur cette période : enregistre des recettes sur les créneaux, ou ajoute des ingrédients à tes recettes.
+            </div>
+        {% else %}
+            <form method="post" action="{{ path('app_planning_shopping_save') }}" class="card shopping-list-card">
+                <input type="hidden" name="_token" value="{{ csrf_token('planning_shopping_save') }}">
+                <input type="hidden" name="start" value="{{ periodStart|date('Y-m-d') }}">
+                <input type="hidden" name="end" value="{{ periodEnd|date('Y-m-d') }}">
+                <table class="shopping-list-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Catégorie</th>
+                            <th scope="col">Ingrédient</th>
+                            <th scope="col">Quantité</th>
+                            <th scope="col">Unité</th>
+                            <th scope="col">Déjà en stock</th>
+                            <th scope="col">À acheter</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in lines %}
+                            {% set lineKey = (row.category|lower|trim) ~ '|' ~ (row.ingredientName|lower|trim) ~ '|' ~ (row.unit|lower|trim) %}
+                            {% set saved = shoppingStates[lineKey] ?? null %}
+                            <tr>
+                                <td>{{ row.categoryLabel }}</td>
+                                <td>{{ row.ingredientName }}</td>
+                                <td>{{ row.quantity }}</td>
+                                <td>{{ row.unit }}</td>
+                                <td>
+                                    <input
+                                        type="checkbox"
+                                        name="shopping_state[{{ lineKey }}][]"
+                                        value="in_stock"
+                                        {{ saved == 'in_stock' ? 'checked' : '' }}
+                                    >
+                                </td>
+                                <td>
+                                    <input
+                                        type="checkbox"
+                                        name="shopping_state[{{ lineKey }}][]"
+                                        value="to_buy"
+                                        {{ saved == 'to_buy' ? 'checked' : '' }}
+                                    >
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <p class="shopping-list-actions">
+                    <button type="submit" class="btn btn--primary">Sauvegarder la liste</button>
+                </p>
+            </form>
+        {% endif %}
+
+        <section class="card shopping-email-card">
+            <h2 class="card__title">Recevoir la liste par e-mail</h2>
+            <p class="card__hint muted">
+                En développement, configure <code>MAILER_DSN</code> (et optionnellement <code>MAILER_FROM</code>) pour un envoi réel.
+            </p>
+            <form
+                method="post"
+                action="{{ path('app_planning_shopping_email') }}"
+                class="stack-form shopping-email-form"
+            >
+                <input type="hidden" name="_token" value="{{ csrf_token('planning_shopping_email') }}">
+                <input type="hidden" name="start" value="{{ periodStart|date('Y-m-d') }}">
+                <input type="hidden" name="end" value="{{ periodEnd|date('Y-m-d') }}">
+                <div>
+                    <label for="shopping-email-input">Adresse e-mail</label>
+                    <input
+                        id="shopping-email-input"
+                        type="email"
+                        name="email"
+                        required
+                        autocomplete="email"
+                        placeholder="toi@exemple.org"
+                    >
+                </div>
+                <p class="shopping-email-actions">
+                    <button type="submit" class="btn btn--primary">Envoyer la liste</button>
+                </p>
+            </form>
+        </section>
+    </div>
+{% endblock %}

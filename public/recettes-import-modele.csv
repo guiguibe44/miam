@@ -1,0 +1,3 @@
+name,preparation_minutes,cook_minutes,estimated_cost,main_ingredient,seasonality,difficulty,calories,image_url,source_url,portion_price_label,ingredients
+"Tarte aux pommes maison",45,35,3.20,vegetarien,automne,Facile,340,,,,"300|g|pommes;80|g|sucre;150|g|farine;80|g|beurre;1|pce|pate brisee"
+"Poulet au citron",25,40,"4,50",poulet,toute_annee,Moyen,410,,https://exemple.fr/recette/poulet-citron,,"2|pce|filets de poulet;1|pce|citron;10|cl|creme liquide"

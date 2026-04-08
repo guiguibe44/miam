@@ -1,0 +1,179 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Recettes — Miam{% endblock %}
+
+{% block javascripts %}
+    {{ importmap(['app', 'recipe_index']) }}
+    <script type="module">
+        import 'recipe_index';
+    </script>
+{% endblock %}
+
+{% block body %}
+    <h1 class="app-page-title">Recettes</h1>
+    <p class="app-lead">La liste se met à jour pendant que tu tapes le nom ; les autres filtres utilisent « Appliquer ». Les imports Jow sont sur la page dédiée.</p>
+
+    <div class="link-row">
+        <a href="{{ path('app_planning_index') }}">← Planification</a>
+        <a href="{{ path('app_recipe_import') }}">Importer depuis Jow</a>
+        <a href="{{ path('app_recipe_new') }}">+ Nouvelle recette</a>
+    </div>
+
+    <div
+        class="recipe-list-app"
+        data-recipe-list-app
+        data-fragment-url="{{ path('app_recipe_api_list_fragment') }}"
+        data-index-path="{{ path('app_recipe_index') }}"
+    >
+    <div class="recipe-list-layout">
+        <aside class="recipe-sidebar" aria-label="Filtres">
+            <details
+                id="recipe-filters-details"
+                class="recipe-filters-details"
+                data-recipe-filters-details
+                data-initial-open="{{ hasActiveFilters ? '1' : '0' }}"
+            >
+                <summary class="recipe-filters-summary">
+                    <span class="recipe-filters-summary__text">Filtres et tri</span>
+                    <span class="recipe-filters-summary__hint muted">Afficher / masquer</span>
+                </summary>
+                <div class="card recipe-filters-card">
+                    <h2 class="card__title recipe-filters-card__title">Filtres et tri</h2>
+                    <form id="recipe-filters-form" method="get" action="{{ path('app_recipe_index') }}" class="stack-form">
+                        <div class="form-grid form-grid--filters form-grid--sidebar-filters">
+                            <div class="recipe-search">
+                                <label class="recipe-search__label" for="filter-q">Nom de la recette</label>
+                                <div class="recipe-search__shell">
+                                    <span class="recipe-search__icon" aria-hidden="true">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                                            <circle cx="11" cy="11" r="8"/>
+                                            <path d="m21 21-4.3-4.3"/>
+                                        </svg>
+                                    </span>
+                                    <input
+                                        id="filter-q"
+                                        class="recipe-search__input"
+                                        type="search"
+                                        name="q"
+                                        value="{{ filters.q }}"
+                                        placeholder="Ex. tarte, soupe, riz…"
+                                        autocomplete="off"
+                                        autocorrect="off"
+                                        autocapitalize="off"
+                                        spellcheck="false"
+                                        enterkeyhint="search"
+                                    >
+                                </div>
+                                <p class="recipe-search__hint muted">La liste se met à jour tout seul pendant la saisie.</p>
+                            </div>
+                            <div>
+                                <label for="filter-main">Aliment principal</label>
+                                <select id="filter-main" name="mainIngredient">
+                                    <option value="">Tous</option>
+                                    {% for label, value in mainIngredientChoices %}
+                                        <option value="{{ value }}" {{ filters.mainIngredient == value ? 'selected' : '' }}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="filter-season">Saison</label>
+                                <select id="filter-season" name="seasonality">
+                                    <option value="">Toutes</option>
+                                    {% for label, value in seasonalityChoices %}
+                                        <option value="{{ value }}" {{ filters.seasonality == value ? 'selected' : '' }}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="filter-difficulty">Difficulté</label>
+                                <select id="filter-difficulty" name="difficulty">
+                                    <option value="">Toutes</option>
+                                    {% for label, value in difficultyChoices %}
+                                        <option value="{{ value }}" {{ filters.difficulty == value ? 'selected' : '' }}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="filter-max-cost">Prix max (€)</label>
+                                <input id="filter-max-cost" type="number" step="0.01" min="0" name="maxCost" value="{{ filters.maxCost ?? '' }}">
+                            </div>
+                            <div>
+                                <label for="filter-max-calories">Calories max (kcal)</label>
+                                <input id="filter-max-calories" type="number" min="0" step="10" name="maxCalories" value="{{ filters.maxCalories ?? '' }}">
+                            </div>
+                            <div>
+                                <label for="filter-max-prep">Prépa max (min)</label>
+                                <input id="filter-max-prep" type="number" min="0" step="5" name="maxPrep" value="{{ filters.maxPrep ?? '' }}">
+                            </div>
+                            <div>
+                                <label for="filter-max-cook">Cuisson max (min)</label>
+                                <input id="filter-max-cook" type="number" min="0" step="5" name="maxCook" value="{{ filters.maxCook ?? '' }}">
+                            </div>
+                            <div>
+                                <label for="filter-max-total">Temps total max (min)</label>
+                                <input id="filter-max-total" type="number" min="0" step="5" name="maxTotal" value="{{ filters.maxTotal ?? '' }}">
+                            </div>
+                            <div>
+                                <label for="filter-sort">Trier par</label>
+                                <select id="filter-sort" name="sort">
+                                    {% for key, label in sortChoices %}
+                                        <option value="{{ key }}" {{ filters.sort == key ? 'selected' : '' }}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="filter-dir">Ordre</label>
+                                <select id="filter-dir" name="dir">
+                                    <option value="ASC" {{ filters.dir == 'ASC' ? 'selected' : '' }}>Croissant</option>
+                                    <option value="DESC" {{ filters.dir == 'DESC' ? 'selected' : '' }}>Décroissant</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="filter-actions">
+                            <button type="submit" class="btn btn--primary">Appliquer</button>
+                            <a href="{{ path('app_recipe_index') }}" class="btn btn--secondary" data-recipe-reset>Réinitialiser</a>
+                        </p>
+                    </form>
+                </div>
+            </details>
+        </aside>
+
+        <div class="recipe-list-main">
+            <div id="recipe-results" class="recipe-results" data-recipe-results>
+                {% include 'recipe/_list_main.html.twig' with {
+                    recipes: recipes,
+                    pagination: pagination,
+                    filter_query: filter_query,
+                    hasActiveFilters: hasActiveFilters
+                } only %}
+            </div>
+        </div>
+    </div>
+    </div>
+{% endblock %}
+
+{% block body_javascripts %}
+    <script>
+        (function () {
+            var det = document.querySelector('[data-recipe-filters-details]');
+            if (!det || typeof window.matchMedia !== 'function') {
+                return;
+            }
+            var mq = window.matchMedia('(min-width: 960px)');
+            var keepOpen = det.getAttribute('data-initial-open') === '1';
+
+            function sync() {
+                if (mq.matches) {
+                    det.setAttribute('open', '');
+                } else if (keepOpen) {
+                    det.setAttribute('open', '');
+                } else {
+                    det.removeAttribute('open');
+                }
+            }
+
+            mq.addEventListener('change', sync);
+            sync();
+        })();
+    </script>
+{% endblock %}
