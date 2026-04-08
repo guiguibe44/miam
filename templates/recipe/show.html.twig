@@ -1,0 +1,65 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ recipe.name }} — Miam{% endblock %}
+
+{% block body %}
+    <h1 class="app-page-title">{{ recipe.name }}</h1>
+    <div class="link-row">
+        <a href="{{ path('app_recipe_index') }}">← Recettes</a>
+        <a href="{{ path('app_recipe_edit', { id: recipe.id }) }}">Modifier</a>
+    </div>
+
+    <article class="card recipe-show-card">
+        {% if recipe.imageUrl %}
+            <div class="recipe-show-card__media">
+                <img src="{{ recipe.imageUrl }}" alt="{{ recipe.name }}" loading="lazy">
+            </div>
+        {% endif %}
+        <div class="recipe-show-card__body">
+            <div class="recipe-card__meta">
+                <span class="chip">Prép. {{ recipe.preparationTimeMinutes }} min</span>
+                <span class="chip">Cuiss. {{ recipe.cookTimeMinutes }} min</span>
+                <span class="chip chip--accent">Total {{ recipe.totalTimeMinutes }} min</span>
+                {% if recipe.caloriesPerPortion %}
+                    <span class="chip">{{ recipe.caloriesPerPortion }} kcal</span>
+                {% endif %}
+                {% if recipe.difficulty %}
+                    <span class="chip">{{ recipe.difficulty }}</span>
+                {% endif %}
+                <span class="chip">{{ recipe.mainIngredient }}</span>
+                <span class="chip">{{ recipe.seasonality }}</span>
+            </div>
+            <p class="recipe-card__price">
+                <strong>{{ recipe.estimatedCost }} €</strong> / portion
+                {% if recipe.portionPriceLabel %}
+                    <br><span class="muted">{{ recipe.portionPriceLabel }}</span>
+                {% endif %}
+            </p>
+            {% if recipe.sourceUrl %}
+                <p><a href="{{ recipe.sourceUrl }}" target="_blank" rel="noopener noreferrer">Voir la source</a></p>
+            {% endif %}
+
+            <h2 class="section-title">Ingrédients</h2>
+            {% if recipe.recipeIngredients is empty %}
+                <p class="muted">Aucun ingrédient renseigné.</p>
+            {% else %}
+                <ul class="recipe-show-ingredients">
+                    {% for line in recipe.recipeIngredients %}
+                        <li>
+                            <strong>{{ line.quantity }} {{ line.unit }}</strong>
+                            — {{ line.ingredientName }}
+                            <span class="muted">({{ line.category }})</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            <h2 class="section-title">Étapes</h2>
+            {% if recipe.steps %}
+                <div class="recipe-show-steps">{{ recipe.steps|nl2br }}</div>
+            {% else %}
+                <p class="muted">Aucune étape renseignée.</p>
+            {% endif %}
+        </div>
+    </article>
+{% endblock %}

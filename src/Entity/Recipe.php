@@ -57,6 +57,9 @@ class Recipe
     #[ORM\Column(length: 160, nullable: true)]
     private ?string $portionPriceLabel = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $steps = null;
+
     /** @var Collection<int, RecipeIngredient> */
     #[ORM\OneToMany(mappedBy: 'recipe', targetEntity: RecipeIngredient::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $recipeIngredients;
@@ -204,6 +207,19 @@ class Recipe
     public function setPortionPriceLabel(?string $portionPriceLabel): self
     {
         $this->portionPriceLabel = $portionPriceLabel;
+
+        return $this;
+    }
+
+    public function getSteps(): ?string
+    {
+        return $this->steps;
+    }
+
+    public function setSteps(?string $steps): self
+    {
+        $steps = $steps !== null ? trim($steps) : null;
+        $this->steps = $steps !== '' ? $steps : null;
 
         return $this;
     }

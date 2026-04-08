@@ -11,6 +11,7 @@ use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\MoneyType;
+use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\UrlType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -67,6 +68,15 @@ class RecipeType extends AbstractType
             ->add('sourceUrl', UrlType::class, [
                 'label' => 'Lien source (ex. Jow)',
                 'required' => false,
+            ])
+            ->add('steps', TextareaType::class, [
+                'label' => 'Étapes',
+                'required' => false,
+                'attr' => [
+                    'rows' => 10,
+                    'placeholder' => "1. Préparer les ingrédients\n2. ...",
+                ],
+                'help' => 'Une étape par ligne, ou format numéroté libre.',
             ])
             ->add('imageFile', FileType::class, [
                 'label' => 'Uploader une image',

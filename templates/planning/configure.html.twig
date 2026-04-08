@@ -138,7 +138,9 @@
                                                             </div>
                                                         {% endif %}
                                                         <div class="plan-recipe-preview__body">
-                                                            <strong class="plan-recipe-preview__name">{{ selected.name }}</strong>
+                                                            <strong class="plan-recipe-preview__name">
+                                                                <a href="{{ path('app_recipe_show', { id: selected.id }) }}">{{ selected.name }}</a>
+                                                            </strong>
                                                             <p class="plan-recipe-preview__meta muted">
                                                                 {{ selected.totalTimeMinutes }} min
                                                                 · {{ selected.estimatedCost }} €

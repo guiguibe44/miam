@@ -48,7 +48,7 @@
     </svg>
     {% set _route = app.request.attributes.get('_route', '') %}
     {% set is_planning = _route starts with 'app_planning' %}
-    {% set nav_recipes_list = _route in ['app_recipe_index', 'app_recipe_new', 'app_recipe_edit'] %}
+    {% set nav_recipes_list = _route in ['app_recipe_index', 'app_recipe_new', 'app_recipe_edit', 'app_recipe_show'] %}
     {% set nav_recipe_import = _route == 'app_recipe_import' %}
     {% set nav_ingredients = _route starts with 'app_ingredient' %}
 

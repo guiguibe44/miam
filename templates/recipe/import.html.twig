@@ -30,6 +30,10 @@
                 <label for="csv-file-input">Fichier .csv</label>
                 <input id="csv-file-input" type="file" name="csv_file" accept=".csv,text/csv" required>
             </div>
+            <label>
+                <input type="checkbox" name="overwrite_existing" value="1">
+                Mettre à jour les recettes déjà existantes
+            </label>
             <button type="submit" class="btn btn--primary">Importer le CSV</button>
         </form>
     </section>
@@ -46,6 +50,10 @@
                 placeholder="https://jow.fr/recipes/..."
                 aria-label="URL de la recette Jow"
             >
+            <label>
+                <input type="checkbox" name="overwrite_existing" value="1">
+                Mettre à jour si déjà importée
+            </label>
             <button type="submit" class="btn btn--primary">Importer</button>
         </form>
     </section>
@@ -71,6 +79,10 @@
                 <label for="jow-blog-covers">Portions</label>
                 <input id="jow-blog-covers" type="number" name="jow_blog_covers" min="1" max="20" value="4">
             </div>
+            <label>
+                <input type="checkbox" name="overwrite_existing" value="1">
+                Mettre à jour les recettes déjà importées
+            </label>
             <button type="submit" class="btn btn--primary jow-blog-import__submit">Importer le menu</button>
         </form>
     </section>

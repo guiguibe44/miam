@@ -156,6 +156,14 @@ class RecipeController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}', name: 'app_recipe_show', methods: ['GET'])]
+    public function show(Recipe $recipe): Response
+    {
+        return $this->render('recipe/show.html.twig', [
+            'recipe' => $recipe,
+        ]);
+    }
+
     #[Route('/{id}/supprimer', name: 'app_recipe_delete', methods: ['POST'])]
     public function delete(Request $request, Recipe $recipe, EntityManagerInterface $entityManager): Response
     {
@@ -181,8 +189,10 @@ class RecipeController extends AbstractController
             return $this->redirectToRoute('app_recipe_import');
         }
 
+        $overwriteExisting = $request->request->getBoolean('overwrite_existing');
+
         try {
-            $recipe = $this->importSingleJowRecipeFromUrl($url, $jowRecipeImporter, $entityManager, $recipeRepository);
+            $recipe = $this->importSingleJowRecipeFromUrl($url, $jowRecipeImporter, $entityManager, $recipeRepository, $overwriteExisting);
         } catch (\Throwable $exception) {
             $this->addFlash('error', $exception->getMessage());
 
@@ -197,7 +207,7 @@ class RecipeController extends AbstractController
 
         $entityManager->flush();
 
-        $this->addFlash('success', sprintf('Recette Jow importee : %s', $recipe->getName()));
+        $this->addFlash('success', sprintf($overwriteExisting ? 'Recette Jow importée/mise à jour : %s' : 'Recette Jow importée : %s', $recipe->getName()));
 
         return $this->redirectToRoute('app_recipe_edit', ['id' => $recipe->getId()]);
     }
@@ -244,27 +254,34 @@ class RecipeController extends AbstractController
         }
 
         $imported = 0;
+        $updated = 0;
         $skipped = 0;
         $errors = [];
+        $overwriteExisting = $request->request->getBoolean('overwrite_existing');
 
         foreach ($recipeUrls as $recipeUrl) {
             $urlWithCovers = $this->recipeUrlWithCovers($recipeUrl, $covers);
             try {
-                $recipe = $this->importSingleJowRecipeFromUrl($urlWithCovers, $jowRecipeImporter, $entityManager, $recipeRepository);
+                $recipe = $this->importSingleJowRecipeFromUrl($urlWithCovers, $jowRecipeImporter, $entityManager, $recipeRepository, $overwriteExisting);
                 if ($recipe === null) {
                     ++$skipped;
                     continue;
                 }
                 $entityManager->flush();
-                ++$imported;
+                if ($overwriteExisting && $recipe->getId() !== null && $recipe->getSourceUrl() !== null) {
+                    ++$updated;
+                } else {
+                    ++$imported;
+                }
             } catch (\Throwable $e) {
                 $errors[] = sprintf('%s — %s', $urlWithCovers, $e->getMessage());
             }
         }
 
         $this->addFlash('success', sprintf(
-            'Blog importe : %d nouvelle(s) recette(s), %d ignoree(s) (deja presentes), %d lien(s) trouve(s).',
+            'Blog importé : %d nouvelle(s), %d mise(s) à jour, %d ignorée(s), %d lien(s) trouvé(s).',
             $imported,
+            $updated,
             $skipped,
             count($recipeUrls)
         ));
@@ -301,7 +318,11 @@ class RecipeController extends AbstractController
         }
 
         try {
-            $result = $recipeCsvImporter->importFromUploadedFile($file, $entityManager);
+            $result = $recipeCsvImporter->importFromUploadedFile(
+                $file,
+                $entityManager,
+                $request->request->getBoolean('overwrite_existing')
+            );
         } catch (\Throwable $e) {
             $this->addFlash('error', 'Import CSV impossible : '.$e->getMessage());
 
@@ -312,8 +333,9 @@ class RecipeController extends AbstractController
         $this->addFlash(
             $summaryLabel,
             sprintf(
-                'Résultat import CSV — importées: %d, ignorées: %d, erreurs: %d.',
+                'Résultat import CSV — importées: %d, mises à jour: %d, ignorées: %d, erreurs: %d.',
                 (int) $result['imported'],
+                (int) ($result['updated'] ?? 0),
                 (int) $result['skipped'],
                 count($result['errors'] ?? [])
             )
@@ -345,10 +367,15 @@ class RecipeController extends AbstractController
         JowRecipeImporter $jowRecipeImporter,
         EntityManagerInterface $entityManager,
         RecipeRepository $recipeRepository,
+        bool $overwriteExisting = false,
     ): ?Recipe {
         $imported = $jowRecipeImporter->importFromUrl($url);
-
-        $recipe = (new Recipe())
+        $existing = $recipeRepository->findDuplicateByNameAndSourceUrl($imported['name'], $imported['sourceUrl']);
+        if ($existing instanceof Recipe && !$overwriteExisting) {
+            return null;
+        }
+        $recipe = $existing instanceof Recipe ? $existing : (new Recipe());
+        $recipe
             ->setName($imported['name'])
             ->setImageUrl($imported['imageUrl'])
             ->setPreparationTimeMinutes($imported['preparationTimeMinutes'])
@@ -358,11 +385,13 @@ class RecipeController extends AbstractController
             ->setDifficulty($imported['difficulty'] ?? null)
             ->setCaloriesPerPortion($imported['caloriesPerPortion'] ?? null)
             ->setSourceUrl($imported['sourceUrl'])
+            ->setSteps($imported['steps'] ?? null)
             ->setMainIngredient($imported['mainIngredient'])
             ->setSeasonality('toute_annee');
-
-        if ($this->hasDuplicateRecipe($recipeRepository, $recipe)) {
-            return null;
+        if ($existing instanceof Recipe) {
+            foreach ($recipe->getRecipeIngredients()->toArray() as $line) {
+                $recipe->removeRecipeIngredient($line);
+            }
         }
 
         foreach ($imported['ingredients'] as $item) {
@@ -383,7 +412,9 @@ class RecipeController extends AbstractController
             $recipe->addRecipeIngredient($recipeIngredient);
         }
 
-        $entityManager->persist($recipe);
+        if (!$existing instanceof Recipe) {
+            $entityManager->persist($recipe);
+        }
 
         return $recipe;
     }

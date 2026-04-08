@@ -90,7 +90,7 @@
                                     <img src="{{ meal.recipeImageUrl }}" alt="" loading="lazy" width="52" height="52">
                                 {% endif %}
                                 <div>
-                                    <strong><a href="{{ path('app_recipe_edit', { id: meal.recipeId }) }}">{{ meal.recipeName }}</a></strong>
+                                    <strong><a href="{{ path('app_recipe_show', { id: meal.recipeId }) }}">{{ meal.recipeName }}</a></strong>
                                     <p class="muted">{{ meal.servedOn|date('d/m/Y') }} · {{ meal.mealLabel }}</p>
                                 </div>
                             </li>

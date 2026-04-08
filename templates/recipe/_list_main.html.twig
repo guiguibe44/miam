@@ -46,6 +46,7 @@
                         {% if recipe.sourceUrl %}
                             <a href="{{ recipe.sourceUrl }}" class="btn btn--secondary" target="_blank" rel="noopener noreferrer">Source</a>
                         {% endif %}
+                        <a href="{{ path('app_recipe_show', {id: recipe.id}) }}" class="btn btn--ghost">Voir</a>
                         <a href="{{ path('app_recipe_edit', {id: recipe.id}) }}" class="btn btn--primary">Modifier</a>
                         <form action="{{ path('app_recipe_delete', {id: recipe.id}) }}" method="post" onsubmit="return confirm('Supprimer cette recette ?');">
                             <input type="hidden" name="_token" value="{{ csrf_token('delete_' ~ recipe.id) }}">

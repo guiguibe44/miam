@@ -24,6 +24,7 @@ class JowRecipeImporter
      *   difficulty:?string,
      *   caloriesPerPortion:?int,
      *   mainIngredient:string,
+     *   steps:?string,
      *   ingredients:list<array{name:string,quantity:string,unit:string}>
      * }
      */
@@ -65,6 +66,7 @@ class JowRecipeImporter
      *   difficulty:?string,
      *   caloriesPerPortion:?int,
      *   mainIngredient:string,
+     *   steps:?string,
      *   ingredients:list<array{name:string,quantity:string,unit:string}>
      * }
      */
@@ -112,6 +114,7 @@ class JowRecipeImporter
         }
 
         $estimatedCost = $this->maxEuroPricePerPortion($portionPriceLabel, $priceLevel);
+        $steps = $this->extractStepsFromNextData($recipe);
 
         return [
             'name' => $name,
@@ -124,6 +127,7 @@ class JowRecipeImporter
             'difficulty' => $difficulty,
             'caloriesPerPortion' => $caloriesPerPortion,
             'mainIngredient' => $this->detectMainIngredient($name, $ingredients),
+            'steps' => $steps,
             'ingredients' => $ingredients,
         ];
     }
@@ -140,6 +144,7 @@ class JowRecipeImporter
      *   difficulty:?string,
      *   caloriesPerPortion:?int,
      *   mainIngredient:string,
+     *   steps:?string,
      *   ingredients:list<array{name:string,quantity:string,unit:string}>
      * }
      */
@@ -180,6 +185,7 @@ class JowRecipeImporter
 
         $priceLevel = $this->detectPriceLevelFromHtml($html);
         $portionPriceLabel = $this->priceLabelFromLevel($priceLevel);
+        $steps = $this->extractStepsFromJsonLd($recipeData);
 
         return [
             'name' => $name,
@@ -192,8 +198,80 @@ class JowRecipeImporter
             'difficulty' => $difficulty,
             'caloriesPerPortion' => $caloriesPerPortion,
             'mainIngredient' => $this->detectMainIngredient($name, $ingredients),
+            'steps' => $steps,
             'ingredients' => $ingredients,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $recipe
+     */
+    private function extractStepsFromNextData(array $recipe): ?string
+    {
+        $candidates = [
+            $recipe['steps'] ?? null,
+            $recipe['preparationSteps'] ?? null,
+            $recipe['instructions'] ?? null,
+            $recipe['directions'] ?? null,
+        ];
+        foreach ($candidates as $candidate) {
+            $steps = $this->stepsFromMixed($candidate);
+            if ($steps !== null) {
+                return $steps;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $recipeData
+     */
+    private function extractStepsFromJsonLd(array $recipeData): ?string
+    {
+        return $this->stepsFromMixed($recipeData['recipeInstructions'] ?? null);
+    }
+
+    private function stepsFromMixed(mixed $value): ?string
+    {
+        if (is_string($value)) {
+            $clean = trim($value);
+            if ($clean === '') {
+                return null;
+            }
+
+            return $clean;
+        }
+
+        if (!is_array($value)) {
+            return null;
+        }
+
+        $lines = [];
+        foreach ($value as $item) {
+            if (is_string($item)) {
+                $line = trim($item);
+            } elseif (is_array($item)) {
+                $line = trim((string) ($item['text'] ?? $item['description'] ?? $item['name'] ?? $item['label'] ?? ''));
+            } else {
+                $line = '';
+            }
+
+            if ($line !== '') {
+                $lines[] = $line;
+            }
+        }
+
+        if ($lines === []) {
+            return null;
+        }
+
+        $out = [];
+        foreach ($lines as $i => $line) {
+            $out[] = sprintf("%d. %s", $i + 1, $line);
+        }
+
+        return implode("\n", $out);
     }
 
     private function normalizeSourceUrl(string $url): string

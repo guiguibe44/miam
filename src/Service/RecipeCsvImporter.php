@@ -63,13 +63,14 @@ final class RecipeCsvImporter
     }
 
     /**
-     * @return array{imported: int, skipped: int, skippedNames: list<string>, errors: list<string>}
+     * @return array{imported: int, updated: int, skipped: int, skippedNames: list<string>, errors: list<string>}
      */
-    public function importFromUploadedFile(UploadedFile $file, EntityManagerInterface $entityManager): array
+    public function importFromUploadedFile(UploadedFile $file, EntityManagerInterface $entityManager, bool $overwriteExisting = false): array
     {
         if ($file->getSize() > self::MAX_FILE_BYTES) {
             return [
                 'imported' => 0,
+                'updated' => 0,
                 'skipped' => 0,
                 'skippedNames' => [],
                 'errors' => [sprintf('Fichier trop volumineux (max %d Mo).', (int) (self::MAX_FILE_BYTES / 1024 / 1024))],
@@ -79,13 +80,13 @@ final class RecipeCsvImporter
         $path = $file->getPathname();
         $handle = fopen($path, 'rb');
         if ($handle === false) {
-            return ['imported' => 0, 'skipped' => 0, 'skippedNames' => [], 'errors' => ['Impossible de lire le fichier.']];
+            return ['imported' => 0, 'updated' => 0, 'skipped' => 0, 'skippedNames' => [], 'errors' => ['Impossible de lire le fichier.']];
         }
 
         try {
             $bom = fread($handle, 3);
             if ($bom === false) {
-                return ['imported' => 0, 'skipped' => 0, 'skippedNames' => [], 'errors' => ['Fichier vide.']];
+                return ['imported' => 0, 'updated' => 0, 'skipped' => 0, 'skippedNames' => [], 'errors' => ['Fichier vide.']];
             }
             if ($bom === '' || $bom !== "\xEF\xBB\xBF") {
                 rewind($handle);
@@ -93,7 +94,7 @@ final class RecipeCsvImporter
 
             $headerRow = fgetcsv($handle, 0, ',', '"', '\\');
             if ($headerRow === false || $headerRow === [null] || $headerRow === []) {
-                return ['imported' => 0, 'skipped' => 0, 'skippedNames' => [], 'errors' => ['En-tête CSV manquant ou illisible.']];
+                return ['imported' => 0, 'updated' => 0, 'skipped' => 0, 'skippedNames' => [], 'errors' => ['En-tête CSV manquant ou illisible.']];
             }
 
             $columnIndex = $this->buildColumnIndex($headerRow);
@@ -101,6 +102,7 @@ final class RecipeCsvImporter
                 if (!isset($columnIndex[$req])) {
                     return [
                         'imported' => 0,
+                        'updated' => 0,
                         'skipped' => 0,
                         'skippedNames' => [],
                         'errors' => [
@@ -114,6 +116,7 @@ final class RecipeCsvImporter
             }
 
             $imported = 0;
+            $updated = 0;
             $skipped = 0;
             $skippedNames = [];
             /** @var list<string> $errors */
@@ -139,12 +142,24 @@ final class RecipeCsvImporter
                     continue;
                 }
 
-                if ($this->recipeRepository->findDuplicateByNameAndSourceUrl(
+                $duplicate = $this->recipeRepository->findDuplicateByNameAndSourceUrl(
                     $recipe->getName(),
                     $recipe->getSourceUrl()
-                ) !== null) {
-                    ++$skipped;
-                    $skippedNames[] = $recipe->getName();
+                );
+                if ($duplicate instanceof Recipe) {
+                    if (!$overwriteExisting) {
+                        ++$skipped;
+                        $skippedNames[] = $recipe->getName();
+
+                        continue;
+                    }
+
+                    $this->applyRecipeData($duplicate, $recipe);
+                    foreach ($duplicate->getRecipeIngredients() as $ri) {
+                        $this->linkIngredientEntity($ri, $entityManager);
+                    }
+                    $entityManager->flush();
+                    ++$updated;
 
                     continue;
                 }
@@ -158,9 +173,32 @@ final class RecipeCsvImporter
                 ++$imported;
             }
 
-            return ['imported' => $imported, 'skipped' => $skipped, 'skippedNames' => $skippedNames, 'errors' => $errors];
+            return ['imported' => $imported, 'updated' => $updated, 'skipped' => $skipped, 'skippedNames' => $skippedNames, 'errors' => $errors];
         } finally {
             fclose($handle);
+        }
+    }
+
+    private function applyRecipeData(Recipe $target, Recipe $source): void
+    {
+        $target
+            ->setPreparationTimeMinutes($source->getPreparationTimeMinutes())
+            ->setCookTimeMinutes($source->getCookTimeMinutes())
+            ->setEstimatedCost($source->getEstimatedCost())
+            ->setMainIngredient($source->getMainIngredient())
+            ->setSeasonality($source->getSeasonality())
+            ->setImageUrl($source->getImageUrl())
+            ->setDifficulty($source->getDifficulty())
+            ->setCaloriesPerPortion($source->getCaloriesPerPortion())
+            ->setSourceUrl($source->getSourceUrl())
+            ->setPortionPriceLabel($source->getPortionPriceLabel())
+            ->setSteps($source->getSteps());
+
+        foreach ($target->getRecipeIngredients()->toArray() as $line) {
+            $target->removeRecipeIngredient($line);
+        }
+        foreach ($source->getRecipeIngredients() as $line) {
+            $target->addRecipeIngredient($line);
         }
     }
 
