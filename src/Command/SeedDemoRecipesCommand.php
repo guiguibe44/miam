@@ -125,7 +125,8 @@ class SeedDemoRecipesCommand extends Command
             ->setPreparationTimeMinutes($prepTime)
             ->setEstimatedCost($cost)
             ->setMainIngredient($mainIngredient)
-            ->setSeasonality($seasonality);
+            ->setSeasonality($seasonality)
+            ->setRecipeOrigin(Recipe::ORIGIN_MAISON);
 
         foreach ($items as [$ingredientName, $quantity, $unit]) {
             $recipeIngredient = (new RecipeIngredient())

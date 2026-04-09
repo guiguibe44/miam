@@ -55,6 +55,9 @@ final class RecipeCsvImporter
         'portion_price_label' => 'portion_price_label',
         'libelle_prix' => 'portion_price_label',
         'ingredients' => 'ingredients',
+        'recipe_origin' => 'recipe_origin',
+        'origine' => 'recipe_origin',
+        'origine_recette' => 'recipe_origin',
     ];
 
     public function __construct(
@@ -192,7 +195,8 @@ final class RecipeCsvImporter
             ->setCaloriesPerPortion($source->getCaloriesPerPortion())
             ->setSourceUrl($source->getSourceUrl())
             ->setPortionPriceLabel($source->getPortionPriceLabel())
-            ->setSteps($source->getSteps());
+            ->setSteps($source->getSteps())
+            ->setRecipeOrigin($source->getRecipeOrigin());
 
         foreach ($target->getRecipeIngredients()->toArray() as $line) {
             $target->removeRecipeIngredient($line);
@@ -327,6 +331,28 @@ final class RecipeCsvImporter
         $sourceUrl = $this->nullableTrimmed($this->cell($row, $columnIndex, 'source_url'), 2048);
         $portionLabel = $this->nullableTrimmed($this->cell($row, $columnIndex, 'portion_price_label'), 160);
 
+        $originRaw = trim($this->cell($row, $columnIndex, 'recipe_origin'));
+        $allowedOrigins = array_values(RecipeChoices::recipeOrigins());
+        if ($originRaw === '') {
+            $recipeOrigin = Recipe::ORIGIN_MAISON;
+            if ($sourceUrl !== null && str_contains($sourceUrl, 'jow.fr')) {
+                $recipeOrigin = Recipe::ORIGIN_JOW;
+            } elseif ($sourceUrl !== null && str_contains($sourceUrl, '750g.com')) {
+                $recipeOrigin = Recipe::ORIGIN_750G;
+            } elseif ($sourceUrl !== null && str_contains($sourceUrl, 'marmiton.org')) {
+                $recipeOrigin = Recipe::ORIGIN_MARMITON;
+            }
+        } elseif (!in_array($originRaw, $allowedOrigins, true)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Ligne %d : origine invalide (%s). Valeurs : %s.',
+                $lineNumber,
+                $originRaw,
+                implode(', ', $allowedOrigins)
+            ));
+        } else {
+            $recipeOrigin = $originRaw;
+        }
+
         $recipe = (new Recipe())
             ->setName($name)
             ->setPreparationTimeMinutes($prep)
@@ -338,7 +364,8 @@ final class RecipeCsvImporter
             ->setCaloriesPerPortion($calories)
             ->setImageUrl($imageUrl)
             ->setSourceUrl($sourceUrl)
-            ->setPortionPriceLabel($portionLabel);
+            ->setPortionPriceLabel($portionLabel)
+            ->setRecipeOrigin($recipeOrigin);
 
         $ingCell = $this->cell($row, $columnIndex, 'ingredients');
         foreach ($this->parseIngredientsCell($ingCell, $lineNumber) as $item) {

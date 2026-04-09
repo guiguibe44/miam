@@ -37,11 +37,24 @@ function initPlanningAutocomplete(pageRoot) {
     const relatedListDifferent = pageRoot.querySelector('[data-related-list-different]');
     const relatedTitlePrimary = pageRoot.querySelector('[data-related-title-primary]');
     const relatedTitleSecondary = pageRoot.querySelector('[data-related-title-secondary]');
+    const relatedBody = pageRoot.querySelector('[data-related-body]');
+    const relatedToggle = pageRoot.querySelector('[data-related-toggle]');
     if (!suggestUrl) {
         return;
     }
 
     let activeBlock = null;
+
+    function setRelatedCollapsed(collapsed) {
+        if (!(relatedWidget instanceof HTMLElement)) {
+            return;
+        }
+        relatedWidget.classList.toggle('is-collapsed', collapsed);
+        if (relatedToggle instanceof HTMLButtonElement) {
+            relatedToggle.textContent = collapsed ? 'Afficher' : 'Masquer';
+            relatedToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        }
+    }
 
     function getExcludeIds(currentRecipeId = null) {
         const ids = [];
@@ -156,6 +169,13 @@ function initPlanningAutocomplete(pageRoot) {
             if (hidden instanceof HTMLInputElement) {
                 hidden.value = '';
             }
+        });
+    }
+
+    if (relatedToggle instanceof HTMLButtonElement && relatedBody instanceof HTMLElement) {
+        relatedToggle.addEventListener('click', () => {
+            const collapsed = !relatedWidget.classList.contains('is-collapsed');
+            setRelatedCollapsed(collapsed);
         });
     }
 
@@ -301,6 +321,7 @@ function initPlanningAutocomplete(pageRoot) {
     });
 
     loadInitialSuggestions();
+    setRelatedCollapsed(false);
 }
 
 function initPlanningSaveForm() {

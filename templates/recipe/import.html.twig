@@ -4,7 +4,7 @@
 
 {% block body %}
     <h1 class="app-page-title">Importer des recettes</h1>
-    <p class="app-lead">Colle une URL Jow, importe un fichier CSV (modèle fourni), ou utilise un article du blog planification. Les recettes reprennent les mêmes champs qu’en saisie manuelle.</p>
+    <p class="app-lead">Colle une URL Jow, 750g ou une page avec données Recipe (schema.org), importe un CSV (modèle fourni), ou un article de planif Jow. Les recettes sont étiquetées Maison / Jow / 750g / Web selon l’origine.</p>
 
     <div class="link-row">
         <a href="{{ path('app_recipe_index') }}">← Liste des recettes</a>
@@ -22,6 +22,7 @@
             <code>seasonality</code>&nbsp;: <code>hiver</code>, <code>printemps</code>, <code>ete</code>, <code>automne</code>, <code>toute_annee</code> (défaut si vide).
             <code>difficulty</code>&nbsp;: <code>Très facile</code>, <code>Facile</code>, <code>Moyen</code>, <code>Difficile</code> ou vide.
             Colonne <code>ingredients</code>&nbsp;: lignes <code>quantité|unité|libellé</code> séparées par <code>;</code> (ex.&nbsp;<code>200|g|farine;2|pce|œufs</code>).
+            Colonne facultative <code>recipe_origin</code>&nbsp;: <code>maison</code>, <code>jow</code>, <code>750g</code>, <code>marmiton</code>, <code>web</code> (sinon déduction depuis <code>source_url</code> si possible pour Jow, 750g ou Marmiton, défaut <code>maison</code>).
             Les lignes déjà présentes (même nom et même URL source, ou sans URL si les deux sans URL) sont ignorées.
         </p>
         <form action="{{ path('app_recipe_import_csv') }}" method="post" enctype="multipart/form-data" class="csv-import">
@@ -49,6 +50,52 @@
                 required
                 placeholder="https://jow.fr/recipes/..."
                 aria-label="URL de la recette Jow"
+            >
+            <label>
+                <input type="checkbox" name="overwrite_existing" value="1">
+                Mettre à jour si déjà importée
+            </label>
+            <button type="submit" class="btn btn--primary">Importer</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2 class="card__title">Recette depuis une URL (schema.org Recipe)</h2>
+        <p class="card__hint">
+            Toute page qui publie un bloc JSON-LD <code>Recipe</code> (ex.&nbsp;
+            <a href="https://www.marmiton.org/recettes/recette_wraps-facon-libanaise_323674.aspx" target="_blank" rel="noopener noreferrer">Marmiton</a>,
+            blogs). L’URL enregistrée comme source est normalisée ; l’origine est <strong>Marmiton</strong> pour ce site, sinon <strong>Web</strong>.
+        </p>
+        <form action="{{ path('app_recipe_import_schema_recipe') }}" method="post" class="jow-import">
+            <input type="hidden" name="_token" value="{{ csrf_token('import_schema_recipe') }}">
+            <input
+                type="url"
+                name="schema_recipe_url"
+                required
+                placeholder="https://…"
+                aria-label="URL de la page recette (JSON-LD Recipe)"
+            >
+            <label>
+                <input type="checkbox" name="overwrite_existing" value="1">
+                Mettre à jour si déjà importée
+            </label>
+            <button type="submit" class="btn btn--primary">Importer</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2 class="card__title">Recette unitaire (URL 750g)</h2>
+        <p class="card__hint">
+            URL du type <code>www.750g.com/…-r12345.htm</code> (fiche recette). L’import remplit ingrédients, étapes et temps si la page est lisible.
+        </p>
+        <form action="{{ path('app_recipe_import_750g') }}" method="post" class="jow-import">
+            <input type="hidden" name="_token" value="{{ csrf_token('import_750g') }}">
+            <input
+                type="url"
+                name="recipe_750g_url"
+                required
+                placeholder="https://www.750g.com/riz-cantonais-r37518.htm"
+                aria-label="URL de la recette 750g"
             >
             <label>
                 <input type="checkbox" name="overwrite_existing" value="1">

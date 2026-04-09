@@ -11,11 +11,11 @@
 
 {% block body %}
     <h1 class="app-page-title">Recettes</h1>
-    <p class="app-lead">La liste se met à jour pendant que tu tapes le nom ; les autres filtres utilisent « Appliquer ». Les imports Jow sont sur la page dédiée.</p>
+    <p class="app-lead">La liste se met à jour pendant que tu tapes le nom ; les autres filtres utilisent « Appliquer ». Imports Jow, 750g et URL (schema.org) sur la page dédiée.</p>
 
     <div class="link-row">
         <a href="{{ path('app_planning_index') }}">← Planification</a>
-        <a href="{{ path('app_recipe_import') }}">Importer depuis Jow</a>
+        <a href="{{ path('app_recipe_import') }}">Importer (Jow, 750g, web…)</a>
         <a href="{{ path('app_recipe_new') }}">+ Nouvelle recette</a>
     </div>
 
@@ -90,6 +90,15 @@
                                     <option value="">Toutes</option>
                                     {% for label, value in difficultyChoices %}
                                         <option value="{{ value }}" {{ filters.difficulty == value ? 'selected' : '' }}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label for="filter-origin">Origine</label>
+                                <select id="filter-origin" name="recipeOrigin">
+                                    <option value="">Toutes</option>
+                                    {% for label, value in recipeOriginChoices %}
+                                        <option value="{{ value }}" {{ filters.recipeOrigin == value ? 'selected' : '' }}>{{ label }}</option>
                                     {% endfor %}
                                 </select>
                             </div>

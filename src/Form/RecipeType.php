@@ -25,6 +25,11 @@ class RecipeType extends AbstractType
     {
         $builder
             ->add('name', TextType::class, ['label' => 'Nom'])
+            ->add('recipeOrigin', ChoiceType::class, [
+                'label' => 'Origine',
+                'choices' => RecipeChoices::recipeOrigins(),
+                'help' => 'Maison : saisie manuelle. Jow / 750g / Marmiton / Web : import ou lien source.',
+            ])
             ->add('preparationTimeMinutes', null, ['label' => 'Temps de preparation (min)'])
             ->add('cookTimeMinutes', IntegerType::class, [
                 'label' => 'Temps de cuisson (min)',

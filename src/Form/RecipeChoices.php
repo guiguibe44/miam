@@ -47,4 +47,18 @@ final class RecipeChoices
             'Toute annee' => 'toute_annee',
         ];
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function recipeOrigins(): array
+    {
+        return [
+            'Maison' => 'maison',
+            'Jow' => 'jow',
+            '750g' => '750g',
+            'Marmiton' => 'marmiton',
+            'Web (URL)' => 'web',
+        ];
+    }
 }

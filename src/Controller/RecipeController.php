@@ -14,6 +14,8 @@ use App\Service\ImageUploader;
 use App\Service\JowBlogRecipeLinkCollector;
 use App\Service\JowRecipeImporter;
 use App\Service\RecipeCsvImporter;
+use App\Service\RecipeSchemaOrgImporter;
+use App\Service\RecipeWeb750gImporter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -36,6 +38,7 @@ class RecipeController extends AbstractController
             'mainIngredientChoices' => RecipeChoices::mainIngredients(),
             'seasonalityChoices' => RecipeChoices::seasonality(),
             'difficultyChoices' => RecipeChoices::difficulties(),
+            'recipeOriginChoices' => RecipeChoices::recipeOrigins(),
             'sortChoices' => [
                 'name' => 'Nom',
                 'cost' => 'Prix',
@@ -192,7 +195,8 @@ class RecipeController extends AbstractController
         $overwriteExisting = $request->request->getBoolean('overwrite_existing');
 
         try {
-            $recipe = $this->importSingleJowRecipeFromUrl($url, $jowRecipeImporter, $entityManager, $recipeRepository, $overwriteExisting);
+            $imported = $jowRecipeImporter->importFromUrl($url);
+            $recipe = $this->persistImportedRecipe($imported, Recipe::ORIGIN_JOW, $entityManager, $recipeRepository, $overwriteExisting);
         } catch (\Throwable $exception) {
             $this->addFlash('error', $exception->getMessage());
 
@@ -262,7 +266,8 @@ class RecipeController extends AbstractController
         foreach ($recipeUrls as $recipeUrl) {
             $urlWithCovers = $this->recipeUrlWithCovers($recipeUrl, $covers);
             try {
-                $recipe = $this->importSingleJowRecipeFromUrl($urlWithCovers, $jowRecipeImporter, $entityManager, $recipeRepository, $overwriteExisting);
+                $imported = $jowRecipeImporter->importFromUrl($urlWithCovers);
+                $recipe = $this->persistImportedRecipe($imported, Recipe::ORIGIN_JOW, $entityManager, $recipeRepository, $overwriteExisting);
                 if ($recipe === null) {
                     ++$skipped;
                     continue;
@@ -294,6 +299,91 @@ class RecipeController extends AbstractController
         }
 
         return $this->redirectToRoute('app_recipe_index');
+    }
+
+    #[Route('/import/750g', name: 'app_recipe_import_750g', methods: ['POST'])]
+    public function importFrom750g(
+        Request $request,
+        RecipeWeb750gImporter $recipeWeb750gImporter,
+        EntityManagerInterface $entityManager,
+        RecipeRepository $recipeRepository,
+    ): Response {
+        if (!$this->isCsrfTokenValid('import_750g', (string) $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Jeton CSRF invalide.');
+        }
+
+        $url = trim((string) $request->request->get('recipe_750g_url'));
+        if ($url === '') {
+            $this->addFlash('error', 'Merci de coller une URL de recette 750g (…-r12345.htm).');
+
+            return $this->redirectToRoute('app_recipe_import');
+        }
+
+        $overwriteExisting = $request->request->getBoolean('overwrite_existing');
+
+        try {
+            $imported = $recipeWeb750gImporter->importFromUrl($url);
+            $recipe = $this->persistImportedRecipe($imported, Recipe::ORIGIN_750G, $entityManager, $recipeRepository, $overwriteExisting);
+        } catch (\Throwable $exception) {
+            $this->addFlash('error', $exception->getMessage());
+
+            return $this->redirectToRoute('app_recipe_import');
+        }
+
+        if ($recipe === null) {
+            $this->addFlash('error', 'Recette deja importee (meme nom et meme URL).');
+
+            return $this->redirectToRoute('app_recipe_import');
+        }
+
+        $entityManager->flush();
+
+        $this->addFlash('success', sprintf($overwriteExisting ? 'Recette 750g importee/mise a jour : %s' : 'Recette 750g importee : %s', $recipe->getName()));
+
+        return $this->redirectToRoute('app_recipe_edit', ['id' => $recipe->getId()]);
+    }
+
+    #[Route('/import/schema-recipe', name: 'app_recipe_import_schema_recipe', methods: ['POST'])]
+    public function importFromSchemaRecipe(
+        Request $request,
+        RecipeSchemaOrgImporter $recipeSchemaOrgImporter,
+        EntityManagerInterface $entityManager,
+        RecipeRepository $recipeRepository,
+    ): Response {
+        if (!$this->isCsrfTokenValid('import_schema_recipe', (string) $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Jeton CSRF invalide.');
+        }
+
+        $url = trim((string) $request->request->get('schema_recipe_url'));
+        if ($url === '') {
+            $this->addFlash('error', 'Merci de coller l’URL de la page recette (JSON-LD schema.org / Recipe).');
+
+            return $this->redirectToRoute('app_recipe_import');
+        }
+
+        $overwriteExisting = $request->request->getBoolean('overwrite_existing');
+
+        try {
+            $imported = $recipeSchemaOrgImporter->importFromUrl($url);
+            $recipeOrigin = $this->recipeOriginForStructuredDataUrl((string) ($imported['sourceUrl'] ?? ''));
+            $recipe = $this->persistImportedRecipe($imported, $recipeOrigin, $entityManager, $recipeRepository, $overwriteExisting);
+        } catch (\Throwable $exception) {
+            $this->addFlash('error', $exception->getMessage());
+
+            return $this->redirectToRoute('app_recipe_import');
+        }
+
+        if ($recipe === null) {
+            $this->addFlash('error', 'Recette deja importee (meme nom et meme URL).');
+
+            return $this->redirectToRoute('app_recipe_import');
+        }
+
+        $entityManager->flush();
+
+        $this->addFlash('success', sprintf($overwriteExisting ? 'Recette importee/mise a jour : %s' : 'Recette importee : %s', $recipe->getName()));
+
+        return $this->redirectToRoute('app_recipe_edit', ['id' => $recipe->getId()]);
     }
 
     #[Route('/import/csv', name: 'app_recipe_import_csv', methods: ['POST'])]
@@ -362,14 +452,29 @@ class RecipeController extends AbstractController
         return $this->redirectToRoute('app_recipe_import');
     }
 
-    private function importSingleJowRecipeFromUrl(
-        string $url,
-        JowRecipeImporter $jowRecipeImporter,
+    /**
+     * @param array{
+     *   name:string,
+     *   sourceUrl:?string,
+     *   imageUrl:?string,
+     *   preparationTimeMinutes:int,
+     *   cookTimeMinutes:int,
+     *   estimatedCost:string,
+     *   portionPriceLabel:?string,
+     *   difficulty:?string,
+     *   caloriesPerPortion:?int,
+     *   mainIngredient:string,
+     *   steps:?string,
+     *   ingredients:list<array{name:string,quantity:string,unit:string}>
+     * } $imported
+     */
+    private function persistImportedRecipe(
+        array $imported,
+        string $recipeOrigin,
         EntityManagerInterface $entityManager,
         RecipeRepository $recipeRepository,
         bool $overwriteExisting = false,
     ): ?Recipe {
-        $imported = $jowRecipeImporter->importFromUrl($url);
         $existing = $recipeRepository->findDuplicateByNameAndSourceUrl($imported['name'], $imported['sourceUrl']);
         if ($existing instanceof Recipe && !$overwriteExisting) {
             return null;
@@ -387,7 +492,8 @@ class RecipeController extends AbstractController
             ->setSourceUrl($imported['sourceUrl'])
             ->setSteps($imported['steps'] ?? null)
             ->setMainIngredient($imported['mainIngredient'])
-            ->setSeasonality('toute_annee');
+            ->setSeasonality('toute_annee')
+            ->setRecipeOrigin($recipeOrigin);
         if ($existing instanceof Recipe) {
             foreach ($recipe->getRecipeIngredients()->toArray() as $line) {
                 $recipe->removeRecipeIngredient($line);
@@ -417,6 +523,19 @@ class RecipeController extends AbstractController
         }
 
         return $recipe;
+    }
+
+    private function recipeOriginForStructuredDataUrl(string $sourceUrl): string
+    {
+        $host = parse_url($sourceUrl, PHP_URL_HOST);
+        if (is_string($host) && $host !== '') {
+            $host = strtolower($host);
+            if ($host === 'marmiton.org' || str_ends_with($host, '.marmiton.org')) {
+                return Recipe::ORIGIN_MARMITON;
+            }
+        }
+
+        return Recipe::ORIGIN_WEB;
     }
 
     /**
@@ -469,6 +588,7 @@ class RecipeController extends AbstractController
             'mainIngredient' => trim((string) $request->query->get('mainIngredient', '')),
             'seasonality' => trim((string) $request->query->get('seasonality', '')),
             'difficulty' => trim((string) $request->query->get('difficulty', '')),
+            'recipeOrigin' => trim((string) $request->query->get('recipeOrigin', '')),
             'maxCost' => $request->query->get('maxCost') !== null && $request->query->get('maxCost') !== ''
                 ? (float) $request->query->get('maxCost')
                 : null,
@@ -527,6 +647,9 @@ class RecipeController extends AbstractController
         if (($filters['difficulty'] ?? '') !== '') {
             $params['difficulty'] = $filters['difficulty'];
         }
+        if (($filters['recipeOrigin'] ?? '') !== '') {
+            $params['recipeOrigin'] = $filters['recipeOrigin'];
+        }
         if (($filters['maxCost'] ?? null) !== null) {
             $params['maxCost'] = $filters['maxCost'];
         }
@@ -567,6 +690,9 @@ class RecipeController extends AbstractController
             return true;
         }
         if (($filters['difficulty'] ?? '') !== '') {
+            return true;
+        }
+        if (($filters['recipeOrigin'] ?? '') !== '') {
             return true;
         }
         if (($filters['maxCost'] ?? null) !== null) {

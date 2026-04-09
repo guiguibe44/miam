@@ -217,7 +217,13 @@
                 </form>
 
                 <aside class="planning-related-float" data-related-widget hidden>
-                    <h3>Suggestions recettes</h3>
+                    <div class="planning-related-head">
+                        <h3>Suggestions recettes</h3>
+                        <button type="button" class="planning-related-toggle" data-related-toggle aria-expanded="true">
+                            Masquer
+                        </button>
+                    </div>
+                    <div class="planning-related-body" data-related-body>
                     <div class="planning-related-group">
                         <p class="planning-related-group__title" data-related-title-primary>Qui ressemblent</p>
                         <ul class="planning-related-list" data-related-list-similar></ul>
@@ -225,6 +231,7 @@
                     <div class="planning-related-group">
                         <p class="planning-related-group__title" data-related-title-secondary>Idées différentes</p>
                         <ul class="planning-related-list" data-related-list-different></ul>
+                    </div>
                     </div>
                 </aside>
             {% endif %}

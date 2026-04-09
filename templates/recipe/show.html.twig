@@ -17,6 +17,7 @@
         {% endif %}
         <div class="recipe-show-card__body">
             <div class="recipe-card__meta">
+                <span class="chip chip--origin">{{ recipe.recipeOriginLabel }}</span>
                 <span class="chip">Prép. {{ recipe.preparationTimeMinutes }} min</span>
                 <span class="chip">Cuiss. {{ recipe.cookTimeMinutes }} min</span>
                 <span class="chip chip--accent">Total {{ recipe.totalTimeMinutes }} min</span>

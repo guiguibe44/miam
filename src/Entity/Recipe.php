@@ -13,6 +13,18 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: RecipeRepository::class)]
 class Recipe
 {
+    public const ORIGIN_MAISON = 'maison';
+
+    public const ORIGIN_JOW = 'jow';
+
+    public const ORIGIN_750G = '750g';
+
+    /** Import depuis une URL exposant schema.org Recipe (JSON-LD), ex. blogs. */
+    public const ORIGIN_WEB = 'web';
+
+    /** Import schema.org depuis marmiton.org */
+    public const ORIGIN_MARMITON = 'marmiton';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -21,6 +33,10 @@ class Recipe
     #[ORM\Column(length: 160)]
     #[Assert\NotBlank]
     private string $name = '';
+
+    #[ORM\Column(name: 'recipe_origin', length: 16, options: ['default' => self::ORIGIN_MAISON])]
+    #[Assert\Choice(choices: ['maison', 'jow', '750g', 'web', 'marmiton'])]
+    private string $recipeOrigin = self::ORIGIN_MAISON;
 
     #[ORM\Column(type: 'smallint')]
     #[Assert\Positive]
@@ -90,6 +106,29 @@ class Recipe
         $this->name = $name;
 
         return $this;
+    }
+
+    public function getRecipeOrigin(): string
+    {
+        return $this->recipeOrigin;
+    }
+
+    public function setRecipeOrigin(string $recipeOrigin): self
+    {
+        $this->recipeOrigin = $recipeOrigin;
+
+        return $this;
+    }
+
+    public function getRecipeOriginLabel(): string
+    {
+        return match ($this->recipeOrigin) {
+            self::ORIGIN_JOW => 'Jow',
+            self::ORIGIN_750G => '750g',
+            self::ORIGIN_MARMITON => 'Marmiton',
+            self::ORIGIN_WEB => 'Web',
+            default => 'Maison',
+        };
     }
 
     public function getPreparationTimeMinutes(): int

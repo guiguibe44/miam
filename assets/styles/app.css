@@ -909,6 +909,12 @@ form [id$="_mealTypes"] label {
     border-color: rgba(234, 88, 12, 0.22);
 }
 
+.chip--origin {
+    background: rgba(99, 102, 241, 0.12);
+    color: #4338ca;
+    border-color: rgba(67, 56, 202, 0.25);
+}
+
 .recipe-card__price {
     font-size: 0.88rem;
     color: var(--color-text-muted);
@@ -1366,6 +1372,33 @@ form [id$="_mealTypes"] label {
     font-size: 0.9rem;
 }
 
+.planning-related-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+}
+
+.planning-related-toggle {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-subtle);
+    color: var(--color-text-muted);
+    border-radius: var(--radius-sm);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.2rem 0.45rem;
+    cursor: pointer;
+}
+
+.planning-related-body {
+    display: block;
+}
+
+.planning-related-float.is-collapsed .planning-related-body {
+    display: none;
+}
+
 .planning-related-group {
     margin-top: 0.55rem;
 }
@@ -1404,6 +1437,32 @@ form [id$="_mealTypes"] label {
         right: 0.65rem;
         width: auto;
         bottom: 0.65rem;
+        padding: 0.5rem 0.55rem;
+        border-radius: 10px;
+    }
+
+    .planning-related-float h3 {
+        margin: 0;
+        font-size: 0.82rem;
+    }
+
+    .planning-related-list {
+        gap: 0.35rem;
+    }
+
+    .planning-related-item {
+        gap: 0.42rem;
+        padding: 0.32rem 0.38rem;
+    }
+
+    .planning-related-item img {
+        width: 32px;
+        height: 32px;
+    }
+
+    .planning-related-pick {
+        font-size: 0.82rem;
+        line-height: 1.25;
     }
 }
 

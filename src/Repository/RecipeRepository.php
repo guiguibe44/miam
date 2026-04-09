@@ -116,6 +116,7 @@ class RecipeRepository extends ServiceEntityRepository
      *   maxCook?: int|null,
      *   maxTotal?: int|null,
      *   maxCalories?: int|null,
+     *   recipeOrigin?: string,
      *   sort?: string,
      *   dir?: string
      * } $filters
@@ -140,6 +141,7 @@ class RecipeRepository extends ServiceEntityRepository
      *   maxCook?: int|null,
      *   maxTotal?: int|null,
      *   maxCalories?: int|null,
+     *   recipeOrigin?: string,
      *   sort?: string,
      *   dir?: string
      * } $filters
@@ -165,6 +167,7 @@ class RecipeRepository extends ServiceEntityRepository
      *   maxCook?: int|null,
      *   maxTotal?: int|null,
      *   maxCalories?: int|null,
+     *   recipeOrigin?: string,
      *   sort?: string,
      *   dir?: string
      * } $filters
@@ -230,6 +233,13 @@ class RecipeRepository extends ServiceEntityRepository
             $queryBuilder
                 ->andWhere('recipe.caloriesPerPortion IS NULL OR recipe.caloriesPerPortion <= :maxCalories')
                 ->setParameter('maxCalories', $filters['maxCalories']);
+        }
+
+        $recipeOrigin = trim((string) ($filters['recipeOrigin'] ?? ''));
+        if ($recipeOrigin !== '') {
+            $queryBuilder
+                ->andWhere('recipe.recipeOrigin = :recipeOrigin')
+                ->setParameter('recipeOrigin', $recipeOrigin);
         }
 
         $sortMap = [

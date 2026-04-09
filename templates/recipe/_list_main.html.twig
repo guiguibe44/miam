@@ -5,7 +5,7 @@
             Aucune recette ne correspond à ces filtres. Élargis les critères ou <a href="{{ path('app_recipe_index') }}">réinitialise</a>.
         {% else %}
             Aucune recette pour l’instant.
-            <a href="{{ path('app_recipe_import') }}">Importer depuis Jow</a>
+            <a href="{{ path('app_recipe_import') }}">Importer des recettes</a>
             ou <a href="{{ path('app_recipe_new') }}">créer une recette</a>.
         {% endif %}
     </div>
@@ -22,6 +22,7 @@
                 <div class="recipe-card__body">
                     <h3 class="recipe-card__title">{{ recipe.name }}</h3>
                     <div class="recipe-card__meta">
+                        <span class="chip chip--origin" title="Origine">{{ recipe.recipeOriginLabel }}</span>
                         <span class="chip">Prép. {{ recipe.preparationTimeMinutes }} min</span>
                         <span class="chip">Cuiss. {{ recipe.cookTimeMinutes }} min</span>
                         <span class="chip chip--accent">Total {{ recipe.totalTimeMinutes }} min</span>
