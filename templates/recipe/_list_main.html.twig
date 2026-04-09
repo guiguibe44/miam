@@ -44,13 +44,38 @@
                     </div>
                     <div class="recipe-card__actions">
                         {% if recipe.sourceUrl %}
-                            <a href="{{ recipe.sourceUrl }}" class="btn btn--secondary" target="_blank" rel="noopener noreferrer">Source</a>
+                            <a
+                                href="{{ recipe.sourceUrl }}"
+                                class="btn btn--secondary btn--icon-only"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Voir la source"
+                                aria-label="Voir la source"
+                            >
+                                <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-link"></use></svg>
+                            </a>
                         {% endif %}
-                        <a href="{{ path('app_recipe_show', {id: recipe.id}) }}" class="btn btn--ghost">Voir</a>
-                        <a href="{{ path('app_recipe_edit', {id: recipe.id}) }}" class="btn btn--primary">Modifier</a>
+                        <a
+                            href="{{ path('app_recipe_show', {id: recipe.id}) }}"
+                            class="btn btn--ghost btn--icon-only"
+                            title="Voir la recette"
+                            aria-label="Voir la recette"
+                        >
+                            <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-eye"></use></svg>
+                        </a>
+                        <a
+                            href="{{ path('app_recipe_edit', {id: recipe.id}) }}"
+                            class="btn btn--primary btn--icon-only"
+                            title="Modifier la recette"
+                            aria-label="Modifier la recette"
+                        >
+                            <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-edit"></use></svg>
+                        </a>
                         <form action="{{ path('app_recipe_delete', {id: recipe.id}) }}" method="post" onsubmit="return confirm('Supprimer cette recette ?');">
                             <input type="hidden" name="_token" value="{{ csrf_token('delete_' ~ recipe.id) }}">
-                            <button type="submit" class="btn btn--danger">Supprimer</button>
+                            <button type="submit" class="btn btn--danger btn--icon-only" title="Supprimer la recette" aria-label="Supprimer la recette">
+                                <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-trash"></use></svg>
+                            </button>
                         </form>
                     </div>
                 </div>

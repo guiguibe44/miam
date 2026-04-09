@@ -35,6 +35,8 @@ function initPlanningAutocomplete(pageRoot) {
     const relatedWidget = pageRoot.querySelector('[data-related-widget]');
     const relatedListSimilar = pageRoot.querySelector('[data-related-list-similar]');
     const relatedListDifferent = pageRoot.querySelector('[data-related-list-different]');
+    const relatedTitlePrimary = pageRoot.querySelector('[data-related-title-primary]');
+    const relatedTitleSecondary = pageRoot.querySelector('[data-related-title-secondary]');
     if (!suggestUrl) {
         return;
     }
@@ -74,15 +76,28 @@ function initPlanningAutocomplete(pageRoot) {
         relatedListSimilar.innerHTML = '';
         relatedListDifferent.innerHTML = '';
 
-        const similar = Array.isArray(groups?.similar) ? groups.similar : [];
-        const different = Array.isArray(groups?.different) ? groups.different : [];
-        if (similar.length === 0 && different.length === 0) {
+        const hasContextual = Array.isArray(groups?.similar) || Array.isArray(groups?.different);
+        const primary = hasContextual
+            ? (Array.isArray(groups?.similar) ? groups.similar : [])
+            : (Array.isArray(groups?.neverSelected) ? groups.neverSelected : []);
+        const secondary = hasContextual
+            ? (Array.isArray(groups?.different) ? groups.different : [])
+            : (Array.isArray(groups?.recentlySelected) ? groups.recentlySelected : []);
+
+        if (relatedTitlePrimary instanceof HTMLElement) {
+            relatedTitlePrimary.textContent = hasContextual ? 'Qui ressemblent' : 'Jamais sélectionnées';
+        }
+        if (relatedTitleSecondary instanceof HTMLElement) {
+            relatedTitleSecondary.textContent = hasContextual ? 'Idées différentes' : 'Récemment sélectionnées';
+        }
+
+        if (primary.length === 0 && secondary.length === 0) {
             relatedWidget.hidden = true;
             return;
         }
 
-        similar.forEach((item) => relatedListSimilar.appendChild(buildRelatedItem(item)));
-        different.forEach((item) => relatedListDifferent.appendChild(buildRelatedItem(item)));
+        primary.forEach((item) => relatedListSimilar.appendChild(buildRelatedItem(item)));
+        secondary.forEach((item) => relatedListDifferent.appendChild(buildRelatedItem(item)));
         relatedWidget.hidden = false;
     }
 
@@ -101,6 +116,24 @@ function initPlanningAutocomplete(pageRoot) {
         }
         const data = await r.json();
         renderRelated(data);
+    }
+
+    function loadInitialSuggestions() {
+        if (!relatedUrl) {
+            return;
+        }
+        const params = new URLSearchParams({ initialLimit: '3' });
+        fetch(`${relatedUrl}?${params.toString()}`, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                if (data) {
+                    renderRelated(data);
+                }
+            })
+            .catch(() => {});
     }
 
     if (relatedWidget instanceof HTMLElement) {
@@ -266,6 +299,8 @@ function initPlanningAutocomplete(pageRoot) {
             activeBlock = block;
         });
     });
+
+    loadInitialSuggestions();
 }
 
 function initPlanningSaveForm() {

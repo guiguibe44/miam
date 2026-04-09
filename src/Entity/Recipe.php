@@ -60,6 +60,12 @@ class Recipe
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $steps = null;
 
+    #[ORM\Column(options: ['default' => 0])]
+    private int $planningSelectionCount = 0;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $planningLastSelectedAt = null;
+
     /** @var Collection<int, RecipeIngredient> */
     #[ORM\OneToMany(mappedBy: 'recipe', targetEntity: RecipeIngredient::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $recipeIngredients;
@@ -220,6 +226,37 @@ class Recipe
     {
         $steps = $steps !== null ? trim($steps) : null;
         $this->steps = $steps !== '' ? $steps : null;
+
+        return $this;
+    }
+
+    public function getPlanningSelectionCount(): int
+    {
+        return $this->planningSelectionCount;
+    }
+
+    public function setPlanningSelectionCount(int $planningSelectionCount): self
+    {
+        $this->planningSelectionCount = max(0, $planningSelectionCount);
+
+        return $this;
+    }
+
+    public function incrementPlanningSelectionCount(): self
+    {
+        ++$this->planningSelectionCount;
+
+        return $this;
+    }
+
+    public function getPlanningLastSelectedAt(): ?\DateTimeImmutable
+    {
+        return $this->planningLastSelectedAt;
+    }
+
+    public function setPlanningLastSelectedAt(?\DateTimeImmutable $planningLastSelectedAt): self
+    {
+        $this->planningLastSelectedAt = $planningLastSelectedAt;
 
         return $this;
     }

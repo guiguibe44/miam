@@ -213,8 +213,12 @@ class PlanningController extends AbstractController
         $recipeId = (int) $request->query->get('recipeId', 0);
         $similarLimit = min(6, max(1, (int) $request->query->get('similarLimit', 3)));
         $differentLimit = min(6, max(1, (int) $request->query->get('differentLimit', 3)));
+        $initialLimit = min(8, max(1, (int) $request->query->get('initialLimit', 3)));
         if ($recipeId <= 0) {
-            return $this->json(['similar' => [], 'different' => []]);
+            return $this->json([
+                'neverSelected' => $recipeRepository->findNeverSelectedForPlanning($initialLimit),
+                'recentlySelected' => $recipeRepository->findRecentlySelectedForPlanning($initialLimit),
+            ]);
         }
 
         $excludeIdsRaw = $request->query->all()['excludeIds'] ?? [];
@@ -320,6 +324,13 @@ class PlanningController extends AbstractController
                 $dirty = true;
             } elseif ($mealSlot->getRecipe()?->getId() !== $recipe->getId()) {
                 $dirty = true;
+            }
+
+            $previousRecipeId = $mealSlot->getRecipe()?->getId();
+            if ($previousRecipeId !== $recipe->getId()) {
+                $recipe
+                    ->incrementPlanningSelectionCount()
+                    ->setPlanningLastSelectedAt(new \DateTimeImmutable('now'));
             }
 
             $mealSlot->setRecipe($recipe);

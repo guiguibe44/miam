@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Miam{% endblock %}</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.15em%22 font-size=%2290%22>🍽</text></svg>">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('favicon-16x16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
+    <meta name="theme-color" content="#ea580c">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&display=swap" rel="stylesheet">
@@ -48,6 +53,15 @@
         <symbol id="icon-lock" viewBox="0 0 24 24">
             <path fill="currentColor" d="M7 10V8a5 5 0 0 1 10 0v2h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1Zm2 0h6V8a3 3 0 1 0-6 0v2Zm3 4a2 2 0 0 1 1 3.732V19a1 1 0 1 1-2 0v-1.268A2 2 0 0 1 12 14Z"/>
         </symbol>
+        <symbol id="icon-eye" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M12 5c-4.9 0-8.85 2.86-10 7c1.15 4.14 5.1 7 10 7s8.85-2.86 10-7c-1.15-4.14-5.1-7-10-7Zm0 12a5 5 0 1 1 0-10a5 5 0 0 1 0 10Zm0-2.2a2.8 2.8 0 1 0 0-5.6a2.8 2.8 0 0 0 0 5.6Z"/>
+        </symbol>
+        <symbol id="icon-edit" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M15.2 3.6a2 2 0 0 1 2.83 0l2.36 2.36a2 2 0 0 1 0 2.83l-9.9 9.9a2 2 0 0 1-.95.53l-4.03.9a1 1 0 0 1-1.2-1.2l.9-4.03a2 2 0 0 1 .53-.95l9.46-9.46Zm1.42 1.41-1.06 1.07l2.36 2.36l1.07-1.06l-2.37-2.37Zm-.94 4.84-2.36-2.36l-6.3 6.3l-.45 2l2-.45l7.11-7.1Z"/>
+        </symbol>
+        <symbol id="icon-link" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M10.59 13.41a1 1 0 0 1 0-1.41l3.18-3.18a3 3 0 0 1 4.24 4.24l-2.12 2.12a3 3 0 0 1-4.24 0a1 1 0 1 1 1.41-1.41a1 1 0 0 0 1.42 0l2.12-2.12a1 1 0 0 0-1.42-1.42L12 13.41a1 1 0 0 1-1.41 0Zm2.82-2.82a1 1 0 0 1 0 1.41l-3.18 3.18a3 3 0 1 1-4.24-4.24l2.12-2.12a3 3 0 0 1 4.24 0a1 1 0 0 1-1.41 1.41a1 1 0 0 0-1.42 0L7.4 12.35a1 1 0 0 0 1.42 1.42L12 10.59a1 1 0 0 1 1.41 0Z"/>
+        </symbol>
     </svg>
     {% set _route = app.request.attributes.get('_route', '') %}
     {% set is_site_access = _route starts with 'app_site_access' %}
@@ -62,7 +76,6 @@
         <div class="app-header__inner">
             <a href="{{ path('app_planning_index') }}" class="app-brand" aria-label="Accueil Miam">
                 <span class="app-brand__name">Miam</span>
-                <span class="app-brand__tag">Famille</span>
             </a>
             <nav class="app-nav" aria-label="Navigation principale">
                 <a href="{{ path('app_planning_index') }}" class="{{ is_planning ? 'is-active' : '' }}">

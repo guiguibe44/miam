@@ -451,23 +451,89 @@ class RecipeRepository extends ServiceEntityRepository
             ->getQuery()
             ->getArrayResult();
 
-        $map = static function (array $rows): array {
-            $out = [];
-            foreach ($rows as $row) {
-                $out[] = [
-                    'id' => (int) $row['id'],
-                    'name' => (string) $row['name'],
-                    'imageUrl' => isset($row['imageUrl']) && $row['imageUrl'] !== null ? (string) $row['imageUrl'] : null,
-                    'mainIngredient' => (string) $row['mainIngredient'],
-                ];
-            }
-
-            return $out;
-        };
-
         return [
-            'similar' => $map($similarRows),
-            'different' => $map($differentRows),
+            'similar' => $this->mapSimpleRecipeRows($similarRows),
+            'different' => $this->mapSimpleRecipeRows($differentRows),
         ];
+    }
+
+    /**
+     * @param list<int> $excludeRecipeIds
+     *
+     * @return list<array{id: int, name: string, imageUrl: ?string, mainIngredient: string}>
+     */
+    public function findNeverSelectedForPlanning(int $limit, array $excludeRecipeIds = []): array
+    {
+        $qb = $this->createQueryBuilder('recipe')
+            ->select('recipe.id', 'recipe.name', 'recipe.imageUrl', 'recipe.mainIngredient')
+            ->andWhere('recipe.planningSelectionCount = 0')
+            ->orderBy('recipe.name', 'ASC')
+            ->setMaxResults(max(1, $limit));
+
+        $excludeIds = $this->normalizeExcludeIds($excludeRecipeIds);
+        if ($excludeIds !== []) {
+            $qb
+                ->andWhere('recipe.id NOT IN (:excludeIds)')
+                ->setParameter('excludeIds', $excludeIds);
+        }
+
+        return $this->mapSimpleRecipeRows($qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * @param list<int> $excludeRecipeIds
+     *
+     * @return list<array{id: int, name: string, imageUrl: ?string, mainIngredient: string}>
+     */
+    public function findRecentlySelectedForPlanning(int $limit, array $excludeRecipeIds = []): array
+    {
+        $qb = $this->createQueryBuilder('recipe')
+            ->select('recipe.id', 'recipe.name', 'recipe.imageUrl', 'recipe.mainIngredient')
+            ->andWhere('recipe.planningLastSelectedAt IS NOT NULL')
+            ->orderBy('recipe.planningLastSelectedAt', 'DESC')
+            ->addOrderBy('recipe.name', 'ASC')
+            ->setMaxResults(max(1, $limit));
+
+        $excludeIds = $this->normalizeExcludeIds($excludeRecipeIds);
+        if ($excludeIds !== []) {
+            $qb
+                ->andWhere('recipe.id NOT IN (:excludeIds)')
+                ->setParameter('excludeIds', $excludeIds);
+        }
+
+        return $this->mapSimpleRecipeRows($qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * @param list<int> $excludeRecipeIds
+     *
+     * @return list<int>
+     */
+    private function normalizeExcludeIds(array $excludeRecipeIds): array
+    {
+        return array_values(array_unique(array_filter(array_map(
+            static fn (mixed $v): int => (int) $v,
+            $excludeRecipeIds
+        ), static fn (int $id): bool => $id > 0)));
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     *
+     * @return list<array{id: int, name: string, imageUrl: ?string, mainIngredient: string}>
+     */
+    private function mapSimpleRecipeRows(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = [
+                'id' => (int) $row['id'],
+                'name' => (string) $row['name'],
+                'imageUrl' => isset($row['imageUrl']) && $row['imageUrl'] !== null ? (string) $row['imageUrl'] : null,
+                'mainIngredient' => (string) $row['mainIngredient'],
+            ];
+        }
+
+        return $out;
     }
 }

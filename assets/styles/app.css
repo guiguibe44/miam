@@ -82,6 +82,7 @@ body.app-body {
     font-weight: 700;
     font-size: 1.35rem;
     letter-spacing: -0.02em;
+    color: var(--color-accent);
 }
 
 .app-brand__tag {
@@ -138,6 +139,22 @@ body.app-body {
 .app-nav a.is-active {
     color: var(--color-accent);
     background: var(--color-accent-subtle);
+}
+
+@media (max-width: 720px) {
+    .app-nav a {
+        font-size: 0;
+        gap: 0;
+        padding: 0.5rem;
+        min-width: 2.1rem;
+        min-height: 2.1rem;
+        justify-content: center;
+    }
+
+    .app-nav a .app-icon {
+        width: 1.05rem;
+        height: 1.05rem;
+    }
 }
 
 .app-nav__lock {
@@ -914,6 +931,12 @@ form [id$="_mealTypes"] label {
 
 .recipe-card__actions form {
     margin: 0;
+}
+
+.btn--icon-only {
+    padding: 0.45rem;
+    min-width: 2rem;
+    min-height: 2rem;
 }
 
 /* Planning slots */
