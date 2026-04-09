@@ -45,13 +45,19 @@
         <symbol id="icon-cart" viewBox="0 0 24 24">
             <path fill="currentColor" d="M3 4a1 1 0 0 1 1-1h1.2a2 2 0 0 1 1.94 1.515L7.5 6H20a1 1 0 0 1 .97 1.243l-1.5 6A2 2 0 0 1 17.53 15H9a2 2 0 0 1-1.94-1.515L5.26 6.3L5.2 6H4a1 1 0 0 1-1-1Zm5.74 4 .26 1h9.72l1-4H8.24ZM8 18a2 2 0 1 1 0 4a2 2 0 0 1 0-4Zm8 0a2 2 0 1 1 0 4a2 2 0 0 1 0-4Z"/>
         </symbol>
+        <symbol id="icon-lock" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M7 10V8a5 5 0 0 1 10 0v2h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1Zm2 0h6V8a3 3 0 1 0-6 0v2Zm3 4a2 2 0 0 1 1 3.732V19a1 1 0 1 1-2 0v-1.268A2 2 0 0 1 12 14Z"/>
+        </symbol>
     </svg>
     {% set _route = app.request.attributes.get('_route', '') %}
+    {% set is_site_access = _route starts with 'app_site_access' %}
     {% set is_planning = _route starts with 'app_planning' %}
     {% set nav_recipes_list = _route in ['app_recipe_index', 'app_recipe_new', 'app_recipe_edit', 'app_recipe_show'] %}
     {% set nav_recipe_import = _route == 'app_recipe_import' %}
     {% set nav_ingredients = _route starts with 'app_ingredient' %}
+    {% set site_access_greeting = app.session.get('site_access_user_greeting') %}
 
+    {% if not is_site_access %}
     <header class="app-header">
         <div class="app-header__inner">
             <a href="{{ path('app_planning_index') }}" class="app-brand" aria-label="Accueil Miam">
@@ -75,9 +81,18 @@
                     <svg class="app-icon" aria-hidden="true"><use href="#icon-book"></use></svg>
                     Ingrédients
                 </a>
+                <form method="post" action="{{ path('app_site_access_lock') }}" class="app-nav__lock">
+                    <button type="submit" class="app-nav__lock-btn" title="Verrouiller le site" aria-label="Verrouiller le site">
+                        <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-lock"></use></svg>
+                    </button>
+                </form>
+                {% if site_access_greeting %}
+                    <span class="app-nav__greeting">{{ site_access_greeting }}</span>
+                {% endif %}
             </nav>
         </div>
     </header>
+    {% endif %}
 
     <main class="app-main" id="main-content">
         {% block flashes %}
@@ -98,9 +113,11 @@
         {% block body %}{% endblock %}
     </main>
 
-    <footer class="app-footer">
-        Miam — planification des repas
-    </footer>
+    {% if not is_site_access %}
+        <footer class="app-footer">
+            Miam — planification des repas
+        </footer>
+    {% endif %}
 
     {% block body_javascripts %}{% endblock %}
 </body>

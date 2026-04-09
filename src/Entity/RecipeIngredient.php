@@ -113,9 +113,10 @@ class RecipeIngredient
         return $this->category;
     }
 
-    public function setCategory(string $category): self
+    public function setCategory(?string $category): self
     {
-        $this->category = trim($category) !== '' ? trim($category) : 'autre';
+        $normalized = trim((string) $category);
+        $this->category = $normalized !== '' ? $normalized : 'autre';
 
         return $this;
     }

@@ -1,0 +1,35 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Accès sécurisé{% endblock %}
+{% block flashes %}{% endblock %}
+
+{% block body %}
+    <section class="card site-access-card">
+        <h1 class="app-page-title">Accès protégé</h1>
+        <p class="app-lead">Entrez un code PIN à 4 chiffres pour accéder au site.</p>
+        {% for message in app.flashes('error') %}
+            <div class="flash flash--error">{{ message }}</div>
+        {% endfor %}
+
+        <form method="post" class="site-access-form">
+            <div class="form-row">
+                <label for="site-access-pin">Code PIN</label>
+                <input
+                    id="site-access-pin"
+                    name="pin"
+                    type="password"
+                    inputmode="numeric"
+                    maxlength="4"
+                    minlength="4"
+                    pattern="[0-9]{4}"
+                    autocomplete="one-time-code"
+                    placeholder="••••"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="btn btn--primary btn--wide">Déverrouiller</button>
+        </form>
+    </section>
+{% endblock %}
+

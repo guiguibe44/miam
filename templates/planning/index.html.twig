@@ -43,35 +43,36 @@
                                         {% endif %}
                                     </p>
                                 </div>
-                                <a
-                                    class="btn btn--secondary"
-                                    href="{{ path('app_planning_configure', {
-                                        planning_filter: {
-                                            periodStart: week.weekStart|date('Y-m-d'),
-                                            periodEnd: week.weekEnd|date('Y-m-d'),
-                                            days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
-                                            mealTypes: ['midi', 'soir'],
-                                        },
-                                        planning_show_slots: 1,
-                                    }) }}"
-                                >
-                                    <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-calendar"></use></svg>
-                                    Ouvrir
-                                </a>
-                                <form method="post" action="{{ path('app_planning_history_duplicate', { weekStart: week.weekStart|date('Y-m-d') }) }}">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('planning_duplicate_' ~ week.weekStart|date('Y-m-d')) }}">
-                                    <button type="submit" class="btn btn--primary">
-                                        <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-copy"></use></svg>
-                                        Dupliquer
-                                    </button>
-                                </form>
-                                <form method="post" action="{{ path('app_planning_history_delete', { weekStart: week.weekStart|date('Y-m-d') }) }}">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('planning_delete_' ~ week.weekStart|date('Y-m-d')) }}">
-                                    <button type="submit" class="btn btn--danger" onclick="return confirm('Supprimer cette planification ?');">
-                                        <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-trash"></use></svg>
-                                        Supprimer
-                                    </button>
-                                </form>
+                                <div class="planning-history-item__actions">
+                                    <a
+                                        class="btn btn--secondary"
+                                        title="Ouvrir la semaine"
+                                        aria-label="Ouvrir la semaine"
+                                        href="{{ path('app_planning_configure', {
+                                            planning_filter: {
+                                                periodStart: week.weekStart|date('Y-m-d'),
+                                                periodEnd: week.weekEnd|date('Y-m-d'),
+                                                days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+                                                mealTypes: ['midi', 'soir'],
+                                            },
+                                            planning_show_slots: 1,
+                                        }) }}"
+                                    >
+                                        <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-calendar"></use></svg>
+                                    </a>
+                                    <form method="post" action="{{ path('app_planning_history_duplicate', { weekStart: week.weekStart|date('Y-m-d') }) }}">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('planning_duplicate_' ~ week.weekStart|date('Y-m-d')) }}">
+                                        <button type="submit" class="btn btn--primary" title="Dupliquer la semaine" aria-label="Dupliquer la semaine">
+                                            <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-copy"></use></svg>
+                                        </button>
+                                    </form>
+                                    <form method="post" action="{{ path('app_planning_history_delete', { weekStart: week.weekStart|date('Y-m-d') }) }}">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('planning_delete_' ~ week.weekStart|date('Y-m-d')) }}">
+                                        <button type="submit" class="btn btn--danger" title="Supprimer la semaine" aria-label="Supprimer la semaine" onclick="return confirm('Supprimer cette planification ?');">
+                                            <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-trash"></use></svg>
+                                        </button>
+                                    </form>
+                                </div>
                             </li>
                         {% endfor %}
                     </ul>

@@ -36,7 +36,8 @@ class RecipeIngredientFormType extends AbstractType
             ->add('category', ChoiceType::class, [
                 'label' => 'Catégorie',
                 'required' => false,
-                'placeholder' => 'Autre',
+                'placeholder' => false,
+                'empty_data' => 'autre',
                 'choices' => IngredientCategories::choices(),
             ]);
     }
