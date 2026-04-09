@@ -51,7 +51,10 @@ class PlanningController extends AbstractController
     }
 
     #[Route('/configurer', name: 'app_planning_configure', methods: ['GET'])]
-    public function configure(Request $request, EntityManagerInterface $entityManager): Response
+    public function configure(
+        Request $request,
+        EntityManagerInterface $entityManager,
+    ): Response
     {
         if ($request->query->get('planning_go_slots') === '1') {
             $params = $request->query->all();
@@ -101,6 +104,7 @@ class PlanningController extends AbstractController
             'criteria' => $criteria,
             'planningShowSlots' => $planningShowSlots,
             'planSuggestUrl' => $this->generateUrl('app_planning_api_recipe_suggest'),
+            'planRelatedUrl' => $this->generateUrl('app_planning_api_recipe_related'),
         ]);
     }
 
@@ -201,6 +205,38 @@ class PlanningController extends AbstractController
             'total' => $result['total'],
             'hasMore' => $offset + $loaded < $result['total'],
         ]);
+    }
+
+    #[Route('/api/recettes/related', name: 'app_planning_api_recipe_related', methods: ['GET'])]
+    public function apiRecipeRelated(Request $request, RecipeRepository $recipeRepository): JsonResponse
+    {
+        $recipeId = (int) $request->query->get('recipeId', 0);
+        $similarLimit = min(6, max(1, (int) $request->query->get('similarLimit', 3)));
+        $differentLimit = min(6, max(1, (int) $request->query->get('differentLimit', 3)));
+        if ($recipeId <= 0) {
+            return $this->json(['similar' => [], 'different' => []]);
+        }
+
+        $excludeIdsRaw = $request->query->all()['excludeIds'] ?? [];
+        $excludeIds = [];
+        if (is_array($excludeIdsRaw)) {
+            foreach ($excludeIdsRaw as $value) {
+                $id = (int) $value;
+                if ($id > 0) {
+                    $excludeIds[] = $id;
+                }
+            }
+        }
+        $excludeIds = array_values(array_unique($excludeIds));
+
+        $groups = $recipeRepository->findSuggestionGroupsByRecipeId(
+            $recipeId,
+            $excludeIds,
+            $similarLimit,
+            $differentLimit
+        );
+
+        return $this->json($groups);
     }
 
     #[Route('/enregistrer', name: 'app_planning_save', methods: ['POST'])]
@@ -974,4 +1010,5 @@ class PlanningController extends AbstractController
 
         return null;
     }
+
 }

@@ -31,8 +31,99 @@ function buildMetaLine(item) {
 
 function initPlanningAutocomplete(pageRoot) {
     const suggestUrl = pageRoot.dataset.planningSuggestUrl;
+    const relatedUrl = pageRoot.dataset.planningRelatedUrl;
+    const relatedWidget = pageRoot.querySelector('[data-related-widget]');
+    const relatedListSimilar = pageRoot.querySelector('[data-related-list-similar]');
+    const relatedListDifferent = pageRoot.querySelector('[data-related-list-different]');
     if (!suggestUrl) {
         return;
+    }
+
+    let activeBlock = null;
+
+    function getExcludeIds(currentRecipeId = null) {
+        const ids = [];
+        pageRoot.querySelectorAll('[data-ac-value]').forEach((input) => {
+            const id = Number.parseInt(input.value || '', 10);
+            if (Number.isInteger(id) && id > 0 && id !== currentRecipeId) {
+                ids.push(id);
+            }
+        });
+        return [...new Set(ids)];
+    }
+
+    function buildRelatedItem(item) {
+        const li = document.createElement('li');
+        li.className = 'planning-related-item';
+        const thumb = item.imageUrl
+            ? `<img src="${escapeHtml(item.imageUrl)}" alt="" loading="lazy" width="44" height="44">`
+            : '';
+        li.innerHTML = `${thumb}<button type="button" class="planning-related-pick" data-related-name="${escapeHtml(item.name)}">${escapeHtml(item.name)}</button>`;
+
+        return li;
+    }
+
+    function renderRelated(groups) {
+        if (
+            !(relatedWidget instanceof HTMLElement)
+            || !(relatedListSimilar instanceof HTMLElement)
+            || !(relatedListDifferent instanceof HTMLElement)
+        ) {
+            return;
+        }
+        relatedListSimilar.innerHTML = '';
+        relatedListDifferent.innerHTML = '';
+
+        const similar = Array.isArray(groups?.similar) ? groups.similar : [];
+        const different = Array.isArray(groups?.different) ? groups.different : [];
+        if (similar.length === 0 && different.length === 0) {
+            relatedWidget.hidden = true;
+            return;
+        }
+
+        similar.forEach((item) => relatedListSimilar.appendChild(buildRelatedItem(item)));
+        different.forEach((item) => relatedListDifferent.appendChild(buildRelatedItem(item)));
+        relatedWidget.hidden = false;
+    }
+
+    async function loadRelated(recipeId) {
+        if (!relatedUrl) {
+            return;
+        }
+        const params = new URLSearchParams({ recipeId: String(recipeId), similarLimit: '3', differentLimit: '3' });
+        getExcludeIds(recipeId).forEach((id) => params.append('excludeIds[]', String(id)));
+        const r = await fetch(`${relatedUrl}?${params.toString()}`, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+        if (!r.ok) {
+            return;
+        }
+        const data = await r.json();
+        renderRelated(data);
+    }
+
+    if (relatedWidget instanceof HTMLElement) {
+        relatedWidget.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement) || !target.classList.contains('planning-related-pick')) {
+                return;
+            }
+            const name = target.getAttribute('data-related-name') || '';
+            if (!activeBlock || !name) {
+                return;
+            }
+            const input = activeBlock.querySelector('[data-ac-input]');
+            const hidden = activeBlock.querySelector('[data-ac-value]');
+            if (input instanceof HTMLInputElement) {
+                input.value = name;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.focus();
+            }
+            if (hidden instanceof HTMLInputElement) {
+                hidden.value = '';
+            }
+        });
     }
 
     pageRoot.querySelectorAll('[data-planning-autocomplete]').forEach((block) => {
@@ -95,6 +186,7 @@ function initPlanningAutocomplete(pageRoot) {
             textInput.value = item.name;
             closeList();
             textInput.focus();
+            loadRelated(item.id).catch(() => {});
         }
 
         function highlightActive() {
@@ -165,9 +257,13 @@ function initPlanningAutocomplete(pageRoot) {
         });
 
         textInput.addEventListener('focus', () => {
+            activeBlock = block;
             if (lastItems.length > 0) {
                 openList();
             }
+        });
+        textInput.addEventListener('click', () => {
+            activeBlock = block;
         });
     });
 }

@@ -140,6 +140,37 @@ body.app-body {
     background: var(--color-accent-subtle);
 }
 
+.app-nav__lock {
+    margin: 0;
+}
+
+.app-nav__lock-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    padding: 0.35rem;
+    border-radius: 999px;
+    cursor: pointer;
+    opacity: 0.85;
+}
+
+.app-nav__lock-btn:hover {
+    background: var(--color-bg);
+    color: var(--color-text);
+}
+
+.app-nav__greeting {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    padding-left: 0.1rem;
+}
+
 .app-main {
     max-width: var(--container);
     margin: 0 auto;
@@ -1252,9 +1283,105 @@ form [id$="_mealTypes"] label {
     margin: 0;
 }
 
+.planning-history-item__actions {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-wrap: nowrap;
+}
+
+.planning-history-item__actions .btn {
+    padding: 0.45rem;
+    min-width: 2rem;
+}
+
 .planning-next-card {
     position: sticky;
     top: 5.3rem;
+}
+
+.planning-related-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.55rem;
+}
+
+.planning-related-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.45rem 0.55rem;
+    background: var(--color-bg-subtle);
+}
+
+.planning-related-item img {
+    border-radius: 6px;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+.planning-related-float {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    width: min(320px, calc(100vw - 2rem));
+    z-index: 70;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--color-bg-elevated) 95%, #fff 5%);
+    box-shadow: var(--shadow-md);
+    padding: 0.7rem;
+}
+
+.planning-related-float h3 {
+    margin: 0 0 0.55rem;
+    font-size: 0.9rem;
+}
+
+.planning-related-group {
+    margin-top: 0.55rem;
+}
+
+.planning-related-group:first-of-type {
+    margin-top: 0;
+}
+
+.planning-related-group__title {
+    margin: 0 0 0.3rem;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+}
+
+.planning-related-pick {
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: none;
+    color: var(--color-text);
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
+}
+
+.planning-related-pick:hover {
+    color: var(--color-accent-hover);
+}
+
+@media (max-width: 720px) {
+    .planning-related-float {
+        left: 0.65rem;
+        right: 0.65rem;
+        width: auto;
+        bottom: 0.65rem;
+    }
 }
 
 .planning-next-list {
@@ -1804,4 +1931,24 @@ form [id$="_mealTypes"] label {
     background: var(--color-bg-elevated);
     border-radius: var(--radius-md);
     border: 1px dashed var(--color-border);
+}
+
+.site-access-card {
+    max-width: 28rem;
+    margin: 3rem auto 0;
+}
+
+.site-access-form {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.site-access-form input[name="pin"] {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    text-align: center;
+    font-size: 1.2rem;
+    letter-spacing: 0.25rem;
+    font-weight: 700;
 }

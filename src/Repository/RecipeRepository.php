@@ -314,7 +314,7 @@ class RecipeRepository extends ServiceEntityRepository
 
         $total = (int) $countQb->getQuery()->getSingleScalarResult();
 
-        $rows = $this->createQueryBuilder('recipe')
+        $rowsQb = $this->createQueryBuilder('recipe')
             ->select(
                 'recipe.id',
                 'recipe.name',
@@ -330,9 +330,9 @@ class RecipeRepository extends ServiceEntityRepository
             ->setParameter('q', $needle)
             ->orderBy('recipe.name', 'ASC')
             ->setFirstResult($offset)
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getArrayResult();
+            ->setMaxResults($limit);
+
+        $rows = $rowsQb->getQuery()->getArrayResult();
 
         $items = [];
         foreach ($rows as $row) {
@@ -353,5 +353,121 @@ class RecipeRepository extends ServiceEntityRepository
         }
 
         return ['items' => $items, 'total' => $total];
+    }
+
+    /**
+     * @param list<int> $excludeRecipeIds
+     *
+     * @return list<array{id: int, name: string, imageUrl: ?string, mainIngredient: string}>
+     */
+    public function findRelatedByRecipeId(int $recipeId, array $excludeRecipeIds, int $limit): array
+    {
+        $recipe = $this->find($recipeId);
+        if (!$recipe instanceof Recipe) {
+            return [];
+        }
+
+        $mainIngredient = mb_strtolower(trim($recipe->getMainIngredient()));
+        if ($mainIngredient === '') {
+            return [];
+        }
+
+        $excludeIds = $excludeRecipeIds;
+        $excludeIds[] = $recipeId;
+        $excludeIds = array_values(array_unique(array_filter(array_map(
+            static fn (mixed $v): int => (int) $v,
+            $excludeIds
+        ), static fn (int $id): bool => $id > 0)));
+
+        $rows = $this->createQueryBuilder('recipe')
+            ->select('recipe.id', 'recipe.name', 'recipe.imageUrl', 'recipe.mainIngredient')
+            ->andWhere('LOWER(recipe.mainIngredient) = :mainIngredient')
+            ->setParameter('mainIngredient', $mainIngredient)
+            ->andWhere('recipe.id NOT IN (:excludeIds)')
+            ->setParameter('excludeIds', $excludeIds)
+            ->orderBy('recipe.mainIngredient', 'ASC')
+            ->addOrderBy('recipe.name', 'ASC')
+            ->setMaxResults(max(1, $limit));
+
+        $result = [];
+        foreach ($rows->getQuery()->getArrayResult() as $row) {
+            $result[] = [
+                'id' => (int) $row['id'],
+                'name' => (string) $row['name'],
+                'imageUrl' => isset($row['imageUrl']) && $row['imageUrl'] !== null ? (string) $row['imageUrl'] : null,
+                'mainIngredient' => (string) $row['mainIngredient'],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param list<int> $excludeRecipeIds
+     *
+     * @return array{
+     *   similar: list<array{id: int, name: string, imageUrl: ?string, mainIngredient: string}>,
+     *   different: list<array{id: int, name: string, imageUrl: ?string, mainIngredient: string}>
+     * }
+     */
+    public function findSuggestionGroupsByRecipeId(int $recipeId, array $excludeRecipeIds, int $similarLimit, int $differentLimit): array
+    {
+        $recipe = $this->find($recipeId);
+        if (!$recipe instanceof Recipe) {
+            return ['similar' => [], 'different' => []];
+        }
+
+        $mainIngredient = mb_strtolower(trim($recipe->getMainIngredient()));
+        if ($mainIngredient === '') {
+            return ['similar' => [], 'different' => []];
+        }
+
+        $excludeIds = $excludeRecipeIds;
+        $excludeIds[] = $recipeId;
+        $excludeIds = array_values(array_unique(array_filter(array_map(
+            static fn (mixed $v): int => (int) $v,
+            $excludeIds
+        ), static fn (int $id): bool => $id > 0)));
+
+        $similarRows = $this->createQueryBuilder('recipe')
+            ->select('recipe.id', 'recipe.name', 'recipe.imageUrl', 'recipe.mainIngredient')
+            ->andWhere('LOWER(recipe.mainIngredient) = :mainIngredient')
+            ->setParameter('mainIngredient', $mainIngredient)
+            ->andWhere('recipe.id NOT IN (:excludeIds)')
+            ->setParameter('excludeIds', $excludeIds)
+            ->orderBy('recipe.name', 'ASC')
+            ->setMaxResults(max(1, $similarLimit))
+            ->getQuery()
+            ->getArrayResult();
+
+        $differentRows = $this->createQueryBuilder('recipe')
+            ->select('recipe.id', 'recipe.name', 'recipe.imageUrl', 'recipe.mainIngredient')
+            ->andWhere('LOWER(recipe.mainIngredient) != :mainIngredient')
+            ->setParameter('mainIngredient', $mainIngredient)
+            ->andWhere('recipe.id NOT IN (:excludeIds)')
+            ->setParameter('excludeIds', $excludeIds)
+            ->orderBy('recipe.name', 'ASC')
+            ->setMaxResults(max(1, $differentLimit))
+            ->getQuery()
+            ->getArrayResult();
+
+        $map = static function (array $rows): array {
+            $out = [];
+            foreach ($rows as $row) {
+                $out[] = [
+                    'id' => (int) $row['id'],
+                    'name' => (string) $row['name'],
+                    'imageUrl' => isset($row['imageUrl']) && $row['imageUrl'] !== null ? (string) $row['imageUrl'] : null,
+                    'mainIngredient' => (string) $row['mainIngredient'],
+                ];
+            }
+
+            return $out;
+        };
+
+        return [
+            'similar' => $map($similarRows),
+            'different' => $map($differentRows),
+        ];
     }
 }

@@ -15,6 +15,7 @@
     <div
         class="planning-page"
         data-planning-suggest-url="{{ planSuggestUrl|e('html_attr') }}"
+        data-planning-related-url="{{ planRelatedUrl|e('html_attr') }}"
     >
         <h1 class="app-page-title">Configurer une planification</h1>
 
@@ -214,6 +215,18 @@
                         <p class="planning-save-hint muted">Une seule sauvegarde pour tous les midi et soirs affichés. Pense à valider après tes recherches.</p>
                     </div>
                 </form>
+
+                <aside class="planning-related-float" data-related-widget hidden>
+                    <h3>Suggestions recettes</h3>
+                    <div class="planning-related-group">
+                        <p class="planning-related-group__title">Qui ressemblent</p>
+                        <ul class="planning-related-list" data-related-list-similar></ul>
+                    </div>
+                    <div class="planning-related-group">
+                        <p class="planning-related-group__title">Idées différentes</p>
+                        <ul class="planning-related-list" data-related-list-different></ul>
+                    </div>
+                </aside>
             {% endif %}
         {% endif %}
     </div>
