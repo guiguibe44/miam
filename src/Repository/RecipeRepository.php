@@ -546,4 +546,34 @@ class RecipeRepository extends ServiceEntityRepository
 
         return $out;
     }
+
+    /**
+     * @return list<array{id: int, name: string, imageUrl: ?string}>
+     */
+    public function findForPlanningLibrary(string $q, int $limit): array
+    {
+        $queryBuilder = $this->createQueryBuilder('recipe')
+            ->select('recipe.id', 'recipe.name', 'recipe.imageUrl')
+            ->orderBy('recipe.name', 'ASC')
+            ->setMaxResults(max(1, $limit));
+
+        $search = trim($q);
+        if ($search !== '') {
+            $queryBuilder
+                ->andWhere('LOWER(recipe.name) LIKE :q')
+                ->setParameter('q', '%'.mb_strtolower($search).'%');
+        }
+
+        $rows = $queryBuilder->getQuery()->getArrayResult();
+        $items = [];
+        foreach ($rows as $row) {
+            $items[] = [
+                'id' => (int) $row['id'],
+                'name' => (string) $row['name'],
+                'imageUrl' => isset($row['imageUrl']) && $row['imageUrl'] !== null ? (string) $row['imageUrl'] : null,
+            ];
+        }
+
+        return $items;
+    }
 }

@@ -105,6 +105,18 @@ class PlanningController extends AbstractController
             'planningShowSlots' => $planningShowSlots,
             'planSuggestUrl' => $this->generateUrl('app_planning_api_recipe_suggest'),
             'planRelatedUrl' => $this->generateUrl('app_planning_api_recipe_related'),
+            'planLibraryUrl' => $this->generateUrl('app_planning_api_recipe_library'),
+        ]);
+    }
+
+    #[Route('/api/recettes/library', name: 'app_planning_api_recipe_library', methods: ['GET'])]
+    public function apiRecipeLibrary(Request $request, RecipeRepository $recipeRepository): JsonResponse
+    {
+        $q = trim((string) $request->query->get('q', ''));
+        $limit = min(80, max(10, (int) $request->query->get('limit', 40)));
+
+        return $this->json([
+            'items' => $recipeRepository->findForPlanningLibrary($q, $limit),
         ]);
     }
 

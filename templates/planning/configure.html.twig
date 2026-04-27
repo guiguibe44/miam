@@ -2,53 +2,22 @@
 
 {% block title %}Configurer une planification — Miam{% endblock %}
 
-{% block javascripts %}
-    {{ importmap(['app', 'planning']) }}
-    <script type="module">
-        import 'planning';
-    </script>
-{% endblock %}
-
 {% block body %}
     {% set querySansSlots = app.request.query.all|filter((v, k) => k != 'planning_show_slots') %}
 
     <div
-        class="planning-page"
+        class="planning-page planning-page--wide"
         data-planning-suggest-url="{{ planSuggestUrl|e('html_attr') }}"
         data-planning-related-url="{{ planRelatedUrl|e('html_attr') }}"
+        data-planning-library-url="{{ planLibraryUrl|e('html_attr') }}"
     >
         <h1 class="app-page-title">Configurer une planification</h1>
 
         {% if not planningShowSlots %}
-            <p class="app-lead">
-                Commence par définir la <strong>période</strong>.
-                Ensuite, tu pourras rechercher et enregistrer les recettes pour chaque créneau.
-            </p>
-        {% else %}
-            <p class="app-lead planning-lead--compact">
-                Période du <strong>{{ criteria.periodStart|date('d/m/Y') }}</strong> au <strong>{{ criteria.periodEnd|date('d/m/Y') }}</strong>.
-                Renseigne chaque repas puis clique sur <strong>Enregistrer la planification</strong> pour tout sauvegarder.
-            </p>
-        {% endif %}
-
-        <div class="link-row">
-            {% if planningShowSlots %}
-                <a href="{{ path('app_planning_configure', querySansSlots) }}">Modifier la période</a>
-            {% endif %}
-        </div>
-
-        <section class="card planning-setup-card">
-            <h2 class="card__title">{% if planningShowSlots %}Paramètres (aperçu){% else %}Période et filtres{% endif %}</h2>
-            {% if not planningShowSlots %}
-                <p class="card__hint">Choisis les dates de début et de fin, puis valide pour afficher les cartes par jour. Tu pourras activer ou désactiver chaque jour et chaque repas directement dans les cartes.</p>
-            {% else %}
-                <p class="card__hint muted">Pour changer les dates, utilise le lien « Modifier la période » ou resoumets ce formulaire.</p>
-            {% endif %}
-
-            {{ form_start(form, { attr: { class: 'stack-form planning-filter-form' } }) }}
-                {% if planningShowSlots %}
-                    <input type="hidden" name="planning_show_slots" value="1">
-                {% endif %}
+            <div class="card planning-setup-card">
+                <h2 class="card__title">Paramètres</h2>
+                <p class="card__hint">Choisis la période et les filtres, puis affiche les créneaux.</p>
+                {{ form_start(form, { attr: { class: 'stack-form planning-filter-form' } }) }}
                 <div class="planning-setup-core">
                     <div class="planning-period-row">
                         {{ form_row(form.periodStart) }}
@@ -61,17 +30,14 @@
                         </div>
                     </div>
                 </div>
-
                 <p class="planning-setup-actions">
                     <button type="submit" name="planning_go_slots" value="1" class="btn btn--primary">
-                        Voir les créneaux et choisir les recettes
+                        Afficher les créneaux
                     </button>
-                    <button type="submit" class="btn btn--ghost">Mettre à jour les filtres uniquement</button>
                 </p>
-            {{ form_end(form) }}
-        </section>
-
-        {% if planningShowSlots %}
+                {{ form_end(form) }}
+            </div>
+        {% else %}
             {% if slotsByDate is empty %}
                 <div class="empty-state">Aucun créneau pour cette période : vérifie les jours cochés et l’intervalle de dates (max. 31 jours).</div>
             {% else %}
@@ -84,137 +50,184 @@
                     <input type="hidden" name="_token" value="{{ csrf_token('planning_save_all') }}">
                     <input type="hidden" name="return_query" value="" data-planning-return-query>
 
-                    <section class="planning-days">
-                        <h2 class="section-title">Menus par jour</h2>
+                    <section class="planning-rebuild-layout">
+                        <aside class="planning-rebuild-left card">
+                            <h2 class="card__title">Recettes</h2>
+                            <label class="visually-hidden" for="planning-library-search">Rechercher une recette</label>
+                            <input
+                                id="planning-library-search"
+                                type="search"
+                                class="plan-autocomplete__input"
+                                placeholder="Rechercher une recette..."
+                                autocomplete="off"
+                                data-planning-library-search
+                            >
+                            <div class="planning-library-list" data-planning-library-list>
+                                <p class="muted">Chargement des recettes...</p>
+                            </div>
+                        </aside>
 
-                        <div class="plan-day-list">
-                            {% for dateKey, daySlots in slotsByDate %}
-                                {% set dayEnabled = false %}
-                                {% for daySlot in daySlots %}
-                                    {% set slotEnabled = enabledSlotsBySlot[daySlot.slotKey] is defined
-                                        ? enabledSlotsBySlot[daySlot.slotKey]
-                                        : (existingPlanWeeks[daySlot.weekStartKey] is defined ? false : true)
-                                    %}
-                                    {% if slotEnabled %}
-                                        {% set dayEnabled = true %}
-                                    {% endif %}
-                                {% endfor %}
-                                <article class="plan-day-card">
-                                    <header class="plan-day-card__header">
-                                        <h3 class="plan-day-card__title">{{ daySlots[0].dateTitle }}</h3>
-                                        <label class="plan-slot-toggle">
-                                            <input
-                                                type="checkbox"
-                                                data-day-toggle
-                                                {{ dayEnabled ? 'checked' : '' }}
-                                            >
-                                        </label>
-                                    </header>
-                                    <div class="plan-day-card__meals">
-                                        {% for slot in daySlots %}
-                                            {% set selected = selectedRecipesBySlot[slot.slotKey] ?? null %}
-                                            {% set isEnabled = enabledSlotsBySlot[slot.slotKey] is defined
-                                                ? enabledSlotsBySlot[slot.slotKey]
-                                                : (existingPlanWeeks[slot.weekStartKey] is defined ? false : true)
-                                            %}
-                                            <div class="plan-meal-block {{ isEnabled ? '' : 'is-disabled' }}" data-meal-block>
-                                                <div class="plan-meal-block__head">
-                                                    <div class="plan-meal-block__title">{{ slot.mealLabel }}</div>
-                                                    <label class="plan-slot-toggle">
-                                                        <input
-                                                            type="checkbox"
-                                                            name="slot_enabled[{{ slot.slotKey }}]"
-                                                            value="1"
-                                                            data-slot-toggle
-                                                            {{ isEnabled ? 'checked' : '' }}
+                        <div class="planning-rebuild-right">
+                            <h2 class="section-title">Jours de la planification</h2>
+                            <div class="plan-day-list">
+                                {% for dateKey, daySlots in slotsByDate %}
+                                    {% set dayEnabled = false %}
+                                    {% for daySlot in daySlots %}
+                                        {% set slotEnabled = enabledSlotsBySlot[daySlot.slotKey] is defined
+                                            ? enabledSlotsBySlot[daySlot.slotKey]
+                                            : (existingPlanWeeks[daySlot.weekStartKey] is defined ? false : true)
+                                        %}
+                                        {% if slotEnabled %}
+                                            {% set dayEnabled = true %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    <article class="plan-day-card">
+                                        <header class="plan-day-card__header">
+                                            <h3 class="plan-day-card__title">{{ daySlots[0].dateTitle }}</h3>
+                                            <label class="plan-slot-toggle">
+                                                <input
+                                                    type="checkbox"
+                                                    data-day-toggle
+                                                    {{ dayEnabled ? 'checked' : '' }}
+                                                >
+                                            </label>
+                                        </header>
+                                        <div class="plan-day-card__meals">
+                                            {% for slot in daySlots %}
+                                                {% set selected = selectedRecipesBySlot[slot.slotKey] ?? null %}
+                                                {% set isEnabled = enabledSlotsBySlot[slot.slotKey] is defined
+                                                    ? enabledSlotsBySlot[slot.slotKey]
+                                                    : (existingPlanWeeks[slot.weekStartKey] is defined ? false : true)
+                                                %}
+                                                <div class="plan-meal-block {{ isEnabled ? '' : 'is-disabled' }}" data-meal-block data-slot-key="{{ slot.slotKey }}">
+                                                    <div class="plan-meal-block__head">
+                                                        <div class="plan-meal-block__title">{{ slot.mealLabel }}</div>
+                                                        <label class="plan-slot-toggle">
+                                                            <input
+                                                                type="checkbox"
+                                                                name="slot_enabled[{{ slot.slotKey }}]"
+                                                                value="1"
+                                                                data-slot-toggle
+                                                                {{ isEnabled ? 'checked' : '' }}
+                                                            >
+                                                        </label>
+                                                    </div>
+
+                                                    <div class="plan-meal-block__body" {{ isEnabled ? '' : 'hidden' }}>
+                                                        <div
+                                                            class="plan-meal-picker"
+                                                            id="ac-{{ slot.dateKey }}-{{ slot.mealType }}"
+                                                            data-slot-drop-target
                                                         >
-                                                    </label>
-                                                </div>
-
-                                                {% if selected %}
-                                                    <div class="plan-recipe-preview">
-                                                        {% if selected.imageUrl %}
-                                                            <div class="plan-recipe-preview__media">
-                                                                <img src="{{ selected.imageUrl }}" alt="" width="72" height="72" loading="lazy">
+                                                            <input
+                                                                type="hidden"
+                                                                name="recipe_assign[{{ slot.slotKey }}]"
+                                                                id="recipe-id-{{ slot.dateKey }}-{{ slot.mealType }}"
+                                                                value="{{ selected.id|default('') }}"
+                                                                data-ac-value
+                                                            >
+                                                            <div class="plan-dropzone {{ selected ? 'has-recipe' : '' }}" data-slot-dropzone>
+                                                                <div class="plan-dropzone__inner">
+                                                                <p class="plan-dropzone__empty" data-slot-dropzone-empty {{ selected ? 'hidden' : '' }}>
+                                                                    Dépose une recette ici
+                                                                </p>
+                                                                <div class="plan-dropzone__recipe" data-slot-preview {{ selected ? '' : 'hidden' }}>
+                                                                    <div
+                                                                        class="plan-dropzone__thumb"
+                                                                        data-slot-preview-media
+                                                                        {{ (selected and selected.imageUrl) ? '' : 'hidden' }}
+                                                                    >
+                                                                        <img
+                                                                            src="{{ selected and selected.imageUrl ? selected.imageUrl : '' }}"
+                                                                            alt=""
+                                                                            width="64"
+                                                                            height="64"
+                                                                            loading="lazy"
+                                                                            data-slot-preview-image
+                                                                        >
+                                                                    </div>
+                                                                    <a
+                                                                        class="plan-dropzone__title"
+                                                                        href="{{ selected ? path('app_recipe_show', { id: selected.id }) : '#' }}"
+                                                                        data-slot-preview-link
+                                                                        {{ selected ? '' : 'hidden' }}
+                                                                    >{% if selected %}{{ selected.name }}{% endif %}</a>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    class="plan-dropzone__clear"
+                                                                    data-slot-clear
+                                                                    aria-label="Retirer la recette"
+                                                                    {{ selected ? '' : 'hidden' }}
+                                                                >×</button>
+                                                                </div>
                                                             </div>
-                                                        {% endif %}
-                                                        <div class="plan-recipe-preview__body">
-                                                            <strong class="plan-recipe-preview__name">
-                                                                <a href="{{ path('app_recipe_show', { id: selected.id }) }}">{{ selected.name }}</a>
-                                                            </strong>
-                                                            <p class="plan-recipe-preview__meta muted">
-                                                                {{ selected.totalTimeMinutes }} min
-                                                                · {{ selected.estimatedCost }} €
-                                                                {% if selected.caloriesPerPortion %}
-                                                                    · {{ selected.caloriesPerPortion }} kcal
-                                                                {% endif %}
-                                                                · {{ selected.mainIngredient }}
-                                                                {% if selected.difficulty %}
-                                                                    · {{ selected.difficulty }}
-                                                                {% endif %}
-                                                            </p>
                                                         </div>
                                                     </div>
-                                                {% endif %}
-
-                                                <div
-                                                    class="plan-meal-picker"
-                                                    id="ac-{{ slot.dateKey }}-{{ slot.mealType }}"
-                                                    data-planning-autocomplete
-                                                >
-                                                    <label class="visually-hidden" for="recipe-q-{{ slot.dateKey }}-{{ slot.mealType }}">
-                                                        Rechercher une recette ({{ slot.mealLabel }})
-                                                    </label>
-                                                    <input
-                                                        type="hidden"
-                                                        name="recipe_assign[{{ slot.slotKey }}]"
-                                                        id="recipe-id-{{ slot.dateKey }}-{{ slot.mealType }}"
-                                                        value="{{ selected.id|default('') }}"
-                                                        data-ac-value
-                                                    >
-                                                    <div class="plan-autocomplete">
-                                                        <input
-                                                            type="search"
-                                                            id="recipe-q-{{ slot.dateKey }}-{{ slot.mealType }}"
-                                                            class="plan-autocomplete__input"
-                                                            placeholder="Tape au moins 2 lettres (nom, infos dans la liste)…"
-                                                            autocomplete="off"
-                                                            autocorrect="off"
-                                                            spellcheck="false"
-                                                            aria-autocomplete="list"
-                                                            aria-expanded="false"
-                                                            data-ac-input
-                                                            value="{{ selected.name|default('') }}"
-                                                            {{ isEnabled ? '' : 'disabled' }}
-                                                        >
-                                                        <ul class="plan-suggest plan-suggest--rich" role="listbox" hidden data-ac-list></ul>
-                                                    </div>
                                                 </div>
-                                            </div>
-                                        {% endfor %}
-                                    </div>
-                                </article>
-                            {% endfor %}
+                                            {% endfor %}
+                                        </div>
+                                    </article>
+                                {% endfor %}
+                            </div>
+
+                            <div class="card planning-rebuild-bottom">
+                                <h3 class="card__title">Paramétrage et sauvegarde</h3>
+                                <p class="planning-setup-actions">
+                                    <a href="{{ path('app_planning_configure', querySansSlots) }}" class="btn btn--secondary">Modifier le paramétrage</a>
+                                    <a href="{{ path('app_planning_configure') }}" class="btn btn--ghost">Nouvelle période</a>
+                                </p>
+
+                                <p class="planning-save-bar__actions">
+                                    <button type="submit" class="btn btn--primary btn--wide planning-save-bar__btn">Enregistrer la planification</button>
+                                    <a
+                                        href="{{ path('app_planning_shopping_list', {
+                                            start: criteria.periodStart|date('Y-m-d'),
+                                            end: criteria.periodEnd|date('Y-m-d'),
+                                        }) }}"
+                                        class="btn btn--ghost planning-save-bar__shopping"
+                                    >
+                                        <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-cart"></use></svg>
+                                        Liste des ingrédients / courses
+                                    </a>
+                                </p>
+                            </div>
                         </div>
                     </section>
-
-                    <div class="planning-save-bar">
-                        <div class="planning-save-bar__actions">
-                            <button type="submit" class="btn btn--primary btn--wide planning-save-bar__btn">Enregistrer la planification</button>
-                            <a
-                                href="{{ path('app_planning_shopping_list', {
-                                    start: criteria.periodStart|date('Y-m-d'),
-                                    end: criteria.periodEnd|date('Y-m-d'),
-                                }) }}"
-                                class="btn btn--ghost planning-save-bar__shopping"
-                            >
-                                <svg class="app-icon app-icon--sm" aria-hidden="true"><use href="#icon-cart"></use></svg>
-                                Liste des courses
-                            </a>
-                        </div>
-                        <p class="planning-save-hint muted">Une seule sauvegarde pour tous les midi et soirs affichés. Pense à valider après tes recherches.</p>
-                    </div>
                 </form>
+
+                <dialog class="planning-pick-modal" data-planning-pick-modal>
+                    <div class="planning-pick-modal__backdrop" data-planning-pick-close></div>
+                    <div class="card planning-pick-modal__card" data-planning-pick-form>
+                        <header class="planning-pick-modal__header">
+                            <h3 class="card__title">Ajouter à un créneau</h3>
+                            <button type="button" class="btn btn--secondary btn--icon-only" data-planning-pick-close aria-label="Fermer">×</button>
+                        </header>
+                        <p class="card__hint" data-planning-pick-recipe></p>
+                        <label for="planning-pick-slot">Créneau libre</label>
+                        <select id="planning-pick-slot" data-planning-pick-slot required></select>
+                        <p class="planning-pick-modal__actions">
+                            <button type="button" class="btn btn--primary" data-planning-pick-submit>Affecter</button>
+                        </p>
+                    </div>
+                </dialog>
+
+                <dialog class="planning-recipe-modal" data-planning-recipe-modal>
+                    <div class="planning-recipe-modal__backdrop" data-planning-recipe-close></div>
+                    <div class="card planning-recipe-modal__card">
+                        <header class="planning-recipe-modal__header">
+                            <h3 class="card__title" data-planning-recipe-title>Détail recette</h3>
+                            <button type="button" class="btn btn--secondary btn--icon-only" data-planning-recipe-close aria-label="Fermer">×</button>
+                        </header>
+                        <iframe
+                            src="about:blank"
+                            title="Détail recette"
+                            loading="lazy"
+                            class="planning-recipe-modal__frame"
+                            data-planning-recipe-frame
+                        ></iframe>
+                    </div>
+                </dialog>
 
                 <aside class="planning-related-float" data-related-widget hidden>
                     <div class="planning-related-head">
@@ -224,17 +237,18 @@
                         </button>
                     </div>
                     <div class="planning-related-body" data-related-body>
-                    <div class="planning-related-group">
-                        <p class="planning-related-group__title" data-related-title-primary>Qui ressemblent</p>
-                        <ul class="planning-related-list" data-related-list-similar></ul>
-                    </div>
-                    <div class="planning-related-group">
-                        <p class="planning-related-group__title" data-related-title-secondary>Idées différentes</p>
-                        <ul class="planning-related-list" data-related-list-different></ul>
-                    </div>
+                        <div class="planning-related-group">
+                            <p class="planning-related-group__title" data-related-title-primary>Qui ressemblent</p>
+                            <ul class="planning-related-list" data-related-list-similar></ul>
+                        </div>
+                        <div class="planning-related-group">
+                            <p class="planning-related-group__title" data-related-title-secondary>Idées différentes</p>
+                            <ul class="planning-related-list" data-related-list-different></ul>
+                        </div>
                     </div>
                 </aside>
             {% endif %}
         {% endif %}
     </div>
 {% endblock %}
+

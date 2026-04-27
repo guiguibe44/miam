@@ -63,4 +63,110 @@
             {% endif %}
         </div>
     </article>
+
+    <section class="card recipe-plan-card">
+        <h2 class="card__title">Ajouter à la planification</h2>
+        <p class="card__hint">Choisis une semaine, un jour et un créneau (midi ou soir).</p>
+        <p class="muted">{{ planningSuggestion.label }}</p>
+        <form
+            method="post"
+            action="{{ path('app_recipe_plan', { id: recipe.id }) }}"
+            class="recipe-plan-form"
+            data-recipe-slot-form
+            data-available-slots="{{ availableSlotsByWeek|json_encode|e('html_attr') }}"
+        >
+            <input type="hidden" name="_token" value="{{ csrf_token('recipe_plan_' ~ recipe.id) }}">
+            <div>
+                <label for="week_start">Planification</label>
+                <select id="week_start" name="week_start" required data-week-select>
+                    {% for option in planningWeeks %}
+                        <option value="{{ option.weekStart }}" {{ option.weekStart == planningSuggestion.weekStart ? 'selected' : '' }}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="slot_choice">Créneau actif libre</label>
+                {% set suggestedSlot = planningSuggestion.weekday ~ '|' ~ planningSuggestion.mealType %}
+                <select id="slot_choice" name="slot_choice" required data-slot-select>
+                    {% for slot in availableSlotsByWeek[planningSuggestion.weekStart]|default([]) %}
+                        <option
+                            value="{{ slot.value }}"
+                            data-readonly="{{ slot.readonly ? '1' : '0' }}"
+                            {{ slot.value == suggestedSlot and not slot.readonly ? 'selected' : '' }}
+                            {{ slot.readonly ? 'disabled' : '' }}
+                        >
+                            {{ slot.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn--primary">Ajouter cette recette</button>
+        </form>
+    </section>
+{% endblock %}
+
+{% block body_javascripts %}
+    <script>
+        (function () {
+            document.querySelectorAll('[data-recipe-slot-form]').forEach(function (form) {
+                if (form.dataset.slotInit === '1') {
+                    return;
+                }
+                form.dataset.slotInit = '1';
+
+                var weekSelect = form.querySelector('[data-week-select]');
+                var slotSelect = form.querySelector('[data-slot-select]');
+                if (!weekSelect || !slotSelect) {
+                    return;
+                }
+
+                var map = {};
+                try {
+                    map = JSON.parse(form.dataset.availableSlots || '{}');
+                } catch (e) {
+                    map = {};
+                }
+
+                function renderSlots() {
+                    var slots = map[weekSelect.value] || [];
+                    var previous = slotSelect.value;
+                    slotSelect.innerHTML = '';
+                    if (!Array.isArray(slots) || slots.length === 0) {
+                        var empty = document.createElement('option');
+                        empty.value = '';
+                        empty.textContent = 'Aucun créneau libre pour cette planification';
+                        slotSelect.appendChild(empty);
+                        slotSelect.value = '';
+                        slotSelect.disabled = true;
+                        return;
+                    }
+
+                    var selectableValues = [];
+                    slots.forEach(function (slot) {
+                        var option = document.createElement('option');
+                        option.value = slot.value;
+                        option.textContent = slot.label;
+                        option.disabled = !!slot.readonly;
+                        slotSelect.appendChild(option);
+                        if (!slot.readonly) {
+                            selectableValues.push(slot.value);
+                        }
+                    });
+
+                    if (selectableValues.length === 0) {
+                        slotSelect.value = '';
+                        slotSelect.disabled = true;
+                        return;
+                    }
+
+                    slotSelect.disabled = false;
+                    var stillExists = selectableValues.indexOf(previous) !== -1;
+                    slotSelect.value = stillExists ? previous : selectableValues[0];
+                }
+
+                weekSelect.addEventListener('change', renderSlots);
+                renderSlots();
+            });
+        })();
+    </script>
 {% endblock %}

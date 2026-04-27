@@ -24,6 +24,10 @@ return [
         'path' => './assets/planning.js',
         'entrypoint' => true,
     ],
+    'recipe_form' => [
+        'path' => './assets/recipe_form.js',
+        'entrypoint' => true,
+    ],
     '@hotwired/stimulus' => [
         'version' => '3.2.2',
     ],

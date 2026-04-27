@@ -29,7 +29,43 @@ function buildMetaLine(item) {
     return parts.map(escapeHtml).join(' · ');
 }
 
+const MIAM_PLANNING_DEBUG = true;
+
+function planningDebug(...args) {
+    if (!MIAM_PLANNING_DEBUG) {
+        return;
+    }
+    console.log('[planning]', ...args);
+}
+
+function upsertPlanningDebugBadge(message, isError = false) {
+    if (!MIAM_PLANNING_DEBUG) {
+        return;
+    }
+    let el = document.getElementById('miam-planning-debug-badge');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'miam-planning-debug-badge';
+        el.style.position = 'fixed';
+        el.style.top = '8px';
+        el.style.right = '8px';
+        el.style.zIndex = '99999';
+        el.style.padding = '6px 10px';
+        el.style.borderRadius = '8px';
+        el.style.font = '12px/1.3 monospace';
+        el.style.boxShadow = '0 2px 12px rgba(0,0,0,0.15)';
+        document.body.appendChild(el);
+    }
+    el.style.background = isError ? '#fee2e2' : '#dcfce7';
+    el.style.color = isError ? '#991b1b' : '#166534';
+    el.style.border = `1px solid ${isError ? '#fecaca' : '#bbf7d0'}`;
+    el.textContent = message;
+}
+
 function initPlanningAutocomplete(pageRoot) {
+    if (pageRoot.dataset.miamPlanningAcInit === '1') {
+        return;
+    }
     const suggestUrl = pageRoot.dataset.planningSuggestUrl;
     const relatedUrl = pageRoot.dataset.planningRelatedUrl;
     const relatedWidget = pageRoot.querySelector('[data-related-widget]');
@@ -42,6 +78,8 @@ function initPlanningAutocomplete(pageRoot) {
     if (!suggestUrl) {
         return;
     }
+
+    pageRoot.dataset.miamPlanningAcInit = '1';
 
     let activeBlock = null;
 
@@ -321,11 +359,442 @@ function initPlanningAutocomplete(pageRoot) {
     });
 
     loadInitialSuggestions();
-    setRelatedCollapsed(false);
+    setRelatedCollapsed(true);
+}
+
+function initPlanningRecipeLibrary(pageRoot) {
+    if (pageRoot.dataset.miamPlanningLibraryInit === '1') {
+        return;
+    }
+
+    const libraryUrl = pageRoot.dataset.planningLibraryUrl;
+    const searchInput = pageRoot.querySelector('[data-planning-library-search]');
+    const listRoot = pageRoot.querySelector('[data-planning-library-list]');
+    if (!libraryUrl || !(searchInput instanceof HTMLInputElement) || !(listRoot instanceof HTMLElement)) {
+        return;
+    }
+
+    pageRoot.dataset.miamPlanningLibraryInit = '1';
+    let timer = null;
+    let activeRecipe = null;
+    const pickModal = pageRoot.querySelector('[data-planning-pick-modal]');
+    const pickForm = pageRoot.querySelector('[data-planning-pick-form]');
+    const pickSlot = pageRoot.querySelector('[data-planning-pick-slot]');
+    const pickRecipe = pageRoot.querySelector('[data-planning-pick-recipe]');
+    const pickSubmit = pageRoot.querySelector('[data-planning-pick-submit]');
+    const pickCloseButtons = pageRoot.querySelectorAll('[data-planning-pick-close]');
+    const detailModal = pageRoot.querySelector('[data-planning-recipe-modal]');
+    const detailFrame = pageRoot.querySelector('[data-planning-recipe-frame]');
+    const detailTitle = pageRoot.querySelector('[data-planning-recipe-title]');
+    const detailCloseButtons = pageRoot.querySelectorAll('[data-planning-recipe-close]');
+
+    function assignRecipeToTarget(target, payload) {
+        if (!payload || !payload.id || !payload.name) {
+            return;
+        }
+        const mealBlock = target.closest('[data-meal-block]');
+        if (mealBlock?.classList.contains('is-disabled')) {
+            return;
+        }
+        const hidden = target.querySelector('[data-ac-value]');
+        const input = target.querySelector('[data-ac-input]');
+        const dropzone = target.querySelector('[data-slot-dropzone]');
+        const emptyHint = target.querySelector('[data-slot-dropzone-empty]');
+        const preview = target.querySelector('[data-slot-preview]');
+        const previewMedia = target.querySelector('[data-slot-preview-media]');
+        const previewImage = target.querySelector('[data-slot-preview-image]');
+        const previewLink = target.querySelector('[data-slot-preview-link]');
+        const clearBtn = target.querySelector('[data-slot-clear]');
+        if (hidden instanceof HTMLInputElement) {
+            hidden.value = String(payload.id);
+        }
+        if (input instanceof HTMLInputElement) {
+            input.value = String(payload.name);
+        }
+        if (dropzone instanceof HTMLElement) {
+            dropzone.classList.add('has-recipe');
+        }
+        if (emptyHint instanceof HTMLElement) {
+            emptyHint.hidden = true;
+        }
+        if (clearBtn instanceof HTMLElement) {
+            clearBtn.hidden = false;
+        }
+        if (previewLink instanceof HTMLAnchorElement) {
+            previewLink.href = `/recettes/${payload.id}`;
+            previewLink.textContent = String(payload.name);
+            previewLink.hidden = false;
+        }
+        if (preview instanceof HTMLElement) {
+            preview.hidden = false;
+        }
+        const imageUrl = typeof payload.imageUrl === 'string' ? payload.imageUrl.trim() : '';
+        if (previewMedia instanceof HTMLElement) {
+            previewMedia.hidden = imageUrl === '';
+        }
+        if (previewImage instanceof HTMLImageElement) {
+            previewImage.src = imageUrl;
+        }
+    }
+
+    function selectedRecipeIds() {
+        const ids = new Set();
+        pageRoot.querySelectorAll('[data-ac-value]').forEach((input) => {
+            const id = Number.parseInt(input.value || '', 10);
+            if (Number.isInteger(id) && id > 0) {
+                ids.add(id);
+            }
+        });
+
+        return ids;
+    }
+
+    function updateLibraryHighlights() {
+        const ids = selectedRecipeIds();
+        listRoot.querySelectorAll('.planning-library-item').forEach((card) => {
+            const id = Number.parseInt(card.getAttribute('data-recipe-id') || '', 10);
+            card.classList.toggle('is-linked', Number.isInteger(id) && ids.has(id));
+        });
+    }
+
+    function freeSlotTargets() {
+        const targets = [];
+        pageRoot.querySelectorAll('[data-slot-drop-target]').forEach((target) => {
+            const block = target.closest('[data-meal-block]');
+            if (block?.classList.contains('is-disabled')) {
+                return;
+            }
+            const hidden = target.querySelector('[data-ac-value]');
+            if (!(hidden instanceof HTMLInputElement) || hidden.value.trim() !== '') {
+                return;
+            }
+            const dayCard = target.closest('.plan-day-card');
+            const dayTitle = dayCard?.querySelector('.plan-day-card__title')?.textContent?.trim() || 'Jour';
+            const mealTitle = block?.querySelector('.plan-meal-block__title')?.textContent?.trim() || 'Repas';
+            targets.push({
+                label: `${dayTitle} — ${mealTitle}`,
+                target,
+            });
+        });
+
+        return targets;
+    }
+
+    function closePickModal() {
+        if (pickModal instanceof HTMLDialogElement && pickModal.open) {
+            pickModal.close();
+        }
+    }
+
+    function closeDetailModal() {
+        if (detailModal instanceof HTMLDialogElement && detailModal.open) {
+            detailModal.close();
+        }
+        if (detailFrame instanceof HTMLIFrameElement) {
+            detailFrame.src = 'about:blank';
+        }
+    }
+
+    function openDetailModal(item) {
+        if (
+            !(detailModal instanceof HTMLDialogElement)
+            || !(detailFrame instanceof HTMLIFrameElement)
+            || !(detailTitle instanceof HTMLElement)
+        ) {
+            return;
+        }
+        detailTitle.textContent = item.name || 'Détail recette';
+        detailFrame.src = `/recettes/${item.id}`;
+        detailModal.showModal();
+    }
+
+    function openPickModal(payload) {
+        if (
+            !(pickModal instanceof HTMLDialogElement)
+            || !(pickSlot instanceof HTMLSelectElement)
+            || !(pickRecipe instanceof HTMLElement)
+            || !(pickSubmit instanceof HTMLButtonElement)
+        ) {
+            return false;
+        }
+
+        const slots = freeSlotTargets();
+        pickRecipe.textContent = `Recette : ${payload.name || 'Recette'}`;
+        pickSlot.innerHTML = '';
+
+        if (slots.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Aucun créneau libre disponible';
+            pickSlot.appendChild(option);
+            pickSlot.disabled = true;
+            pickSubmit.disabled = true;
+        } else {
+            slots.forEach((slot, index) => {
+                const option = document.createElement('option');
+                option.value = String(index);
+                option.textContent = slot.label;
+                pickSlot.appendChild(option);
+            });
+            pickSlot.disabled = false;
+            pickSubmit.disabled = false;
+        }
+
+        pickSubmit.onclick = () => {
+            if (pickSubmit.disabled) {
+                return;
+            }
+            const idx = Number.parseInt(pickSlot.value, 10);
+            if (!Number.isInteger(idx) || !slots[idx]) {
+                return;
+            }
+            assignRecipeToTarget(slots[idx].target, payload);
+            closePickModal();
+            updateLibraryHighlights();
+        };
+
+        pickModal.showModal();
+
+        return true;
+    }
+
+    function renderItems(items) {
+        listRoot.innerHTML = '';
+        if (!Array.isArray(items) || items.length === 0) {
+            listRoot.innerHTML = '<p class="muted">Aucune recette.</p>';
+
+            return;
+        }
+
+        items.forEach((item) => {
+            const card = document.createElement('article');
+            card.className = 'planning-library-item';
+            card.dataset.recipeId = String(item.id);
+            card.dataset.recipeName = item.name || '';
+
+            const thumb = item.imageUrl
+                ? `<img src="${escapeHtml(item.imageUrl)}" alt="" loading="lazy" width="44" height="44">`
+                : '<div class="planning-library-item__thumb-empty" aria-hidden="true">🍽</div>';
+            card.innerHTML = `
+                <div class="planning-library-item__thumb">${thumb}</div>
+                <div class="planning-library-item__body">
+                    <strong>${escapeHtml(item.name || 'Recette')}</strong>
+                    <div class="planning-library-item__actions">
+                        <a href="/recettes/${item.id}" target="_blank" rel="noopener noreferrer" class="btn btn--secondary">Ouvrir</a>
+                        <button
+                            type="button"
+                            class="btn btn--primary btn--icon-only"
+                            data-library-drag
+                            draggable="true"
+                            aria-label="Glisser la recette"
+                            title="Glisser la recette"
+                        >⤢</button>
+                    </div>
+                </div>
+            `;
+            const payload = { id: item.id, name: item.name || '', imageUrl: item.imageUrl || '' };
+            const dragButton = card.querySelector('[data-library-drag]');
+
+            if (dragButton instanceof HTMLButtonElement) {
+                dragButton.addEventListener('dragstart', (event) => {
+                    if (!event.dataTransfer) {
+                        return;
+                    }
+                    event.dataTransfer.setData('text/plain', JSON.stringify(payload));
+                    event.dataTransfer.effectAllowed = 'copy';
+                    card.classList.add('is-dragging');
+                });
+                dragButton.addEventListener('dragend', () => {
+                    card.classList.remove('is-dragging');
+                });
+                dragButton.addEventListener('click', () => {
+                    activeRecipe = payload;
+                    listRoot.querySelectorAll('.planning-library-item').forEach((el) => el.classList.remove('is-active'));
+                    card.classList.add('is-active');
+                    openPickModal(payload);
+                });
+            }
+
+            listRoot.appendChild(card);
+        });
+        updateLibraryHighlights();
+    }
+
+    async function loadLibrary(query) {
+        const params = new URLSearchParams();
+        params.set('limit', '60');
+        if (query.trim() !== '') {
+            params.set('q', query.trim());
+        }
+        const response = await fetch(`${libraryUrl}?${params.toString()}`, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        renderItems(Array.isArray(data.items) ? data.items : []);
+    }
+
+    function bindDropTargets() {
+        pageRoot.querySelectorAll('[data-slot-drop-target]').forEach((target) => {
+            if (target.dataset.dropBound === '1') {
+                return;
+            }
+            target.dataset.dropBound = '1';
+
+            target.addEventListener('dragover', (event) => {
+                const mealBlock = target.closest('[data-meal-block]');
+                if (mealBlock?.classList.contains('is-disabled')) {
+                    return;
+                }
+                event.preventDefault();
+                target.classList.add('is-drop-over');
+            });
+
+            target.addEventListener('dragleave', () => {
+                target.classList.remove('is-drop-over');
+            });
+
+            target.addEventListener('drop', (event) => {
+                target.classList.remove('is-drop-over');
+                const mealBlock = target.closest('[data-meal-block]');
+                if (mealBlock?.classList.contains('is-disabled')) {
+                    return;
+                }
+
+                event.preventDefault();
+                const raw = event.dataTransfer?.getData('text/plain') || '';
+                if (!raw) {
+                    return;
+                }
+                let payload = null;
+                try {
+                    payload = JSON.parse(raw);
+                } catch {
+                    payload = null;
+                }
+                if (!payload || !payload.id || !payload.name) {
+                    return;
+                }
+                assignRecipeToTarget(target, payload);
+                updateLibraryHighlights();
+            });
+
+            target.addEventListener('click', (event) => {
+                const t = event.target;
+                if (t instanceof HTMLElement) {
+                    if (t.closest('[data-slot-clear]')) {
+                        return;
+                    }
+                    if (t.closest('a.plan-dropzone__title')) {
+                        return;
+                    }
+                }
+                if (!activeRecipe) {
+                    return;
+                }
+                assignRecipeToTarget(target, activeRecipe);
+                updateLibraryHighlights();
+            });
+        });
+    }
+
+    function bindClearButtons() {
+        pageRoot.querySelectorAll('[data-slot-clear]').forEach((button) => {
+            if (button.dataset.clearBound === '1') {
+                return;
+            }
+            button.dataset.clearBound = '1';
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const block = button.closest('[data-meal-block]');
+                const picker = block?.querySelector('[data-slot-drop-target]');
+                const hidden = block?.querySelector('[data-ac-value]');
+                const input = block?.querySelector('[data-ac-input]');
+                const preview = picker?.querySelector('[data-slot-preview]');
+                const previewMedia = picker?.querySelector('[data-slot-preview-media]');
+                const previewImage = picker?.querySelector('[data-slot-preview-image]');
+                const previewLink = picker?.querySelector('[data-slot-preview-link]');
+                const dropzone = picker?.querySelector('[data-slot-dropzone]');
+                const emptyHint = picker?.querySelector('[data-slot-dropzone-empty]');
+                const clearBtn = picker?.querySelector('[data-slot-clear]');
+
+                if (hidden instanceof HTMLInputElement) {
+                    hidden.value = '';
+                }
+                if (input instanceof HTMLInputElement) {
+                    input.value = '';
+                }
+                if (previewLink instanceof HTMLAnchorElement) {
+                    previewLink.textContent = '';
+                    previewLink.href = '#';
+                    previewLink.hidden = true;
+                }
+                if (previewImage instanceof HTMLImageElement) {
+                    previewImage.src = '';
+                }
+                if (previewMedia instanceof HTMLElement) {
+                    previewMedia.hidden = true;
+                }
+                if (preview instanceof HTMLElement) {
+                    preview.hidden = true;
+                }
+                if (dropzone instanceof HTMLElement) {
+                    dropzone.classList.remove('has-recipe');
+                }
+                if (emptyHint instanceof HTMLElement) {
+                    emptyHint.hidden = false;
+                }
+                if (clearBtn instanceof HTMLElement) {
+                    clearBtn.hidden = true;
+                }
+                updateLibraryHighlights();
+            });
+        });
+    }
+
+    if (pickModal instanceof HTMLDialogElement) {
+        pickCloseButtons.forEach((button) => {
+            button.addEventListener('click', closePickModal);
+        });
+        if (pickForm instanceof HTMLElement) {
+            pickForm.addEventListener('click', (event) => {
+                event.stopPropagation();
+            });
+        }
+    }
+
+    if (detailModal instanceof HTMLDialogElement) {
+        detailCloseButtons.forEach((button) => {
+            button.addEventListener('click', closeDetailModal);
+        });
+    }
+
+    searchInput.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            loadLibrary(searchInput.value).catch(() => {
+                listRoot.innerHTML = '<p class="muted">Impossible de charger les recettes.</p>';
+            });
+        }, 250);
+    });
+
+    bindDropTargets();
+    bindClearButtons();
+    loadLibrary('').catch(() => {
+        listRoot.innerHTML = '<p class="muted">Impossible de charger les recettes.</p>';
+    });
+    updateLibraryHighlights();
 }
 
 function initPlanningSaveForm() {
     document.querySelectorAll('[data-planning-save-form]').forEach((form) => {
+        if (form.dataset.miamPlanningSaveBound === '1') {
+            return;
+        }
+        form.dataset.miamPlanningSaveBound = '1';
         form.addEventListener('submit', () => {
             form.querySelectorAll('.plan-day-card').forEach((dayCard) => {
                 const dayToggle = dayCard.querySelector('[data-day-toggle]');
@@ -344,6 +813,10 @@ function initPlanningSaveForm() {
 
 function initPlanningSlotToggles() {
     document.querySelectorAll('.plan-day-card').forEach((dayCard) => {
+        if (dayCard.dataset.miamPlanningSlotsInit === '1') {
+            return;
+        }
+        dayCard.dataset.miamPlanningSlotsInit = '1';
         const dayToggle = dayCard.querySelector('[data-day-toggle]');
         const slotToggles = Array.from(dayCard.querySelectorAll('[data-slot-toggle]'));
 
@@ -354,6 +827,68 @@ function initPlanningSlotToggles() {
             }
             const enabled = slotToggle.checked;
             block.classList.toggle('is-disabled', !enabled);
+            const body = block.querySelector('.plan-meal-block__body');
+            const picker = block.querySelector('[data-slot-drop-target]');
+            const assignedInput = picker?.querySelector('[data-ac-value]');
+            const dropzone = picker?.querySelector('[data-slot-dropzone]');
+            const emptyHint = picker?.querySelector('[data-slot-dropzone-empty]');
+            const preview = picker?.querySelector('[data-slot-preview]');
+            const clearBtn = picker?.querySelector('[data-slot-clear]');
+            const previewLink = picker?.querySelector('[data-slot-preview-link]');
+            const hasRecipe = assignedInput instanceof HTMLInputElement && assignedInput.value.trim() !== '';
+
+            if (body instanceof HTMLElement) {
+                if (enabled) {
+                    body.hidden = false;
+                    body.removeAttribute('hidden');
+                    body.style.setProperty('display', 'block', 'important');
+                    // Force un recalcul immédiat dans Firefox après réactivation.
+                    void body.offsetHeight;
+                } else {
+                    body.hidden = true;
+                    body.setAttribute('hidden', '');
+                    body.style.setProperty('display', 'none', 'important');
+                }
+            }
+
+            if (enabled && !hasRecipe) {
+                if (dropzone instanceof HTMLElement) {
+                    dropzone.classList.remove('has-recipe');
+                }
+                if (emptyHint instanceof HTMLElement) {
+                    emptyHint.hidden = false;
+                }
+                if (preview instanceof HTMLElement) {
+                    preview.hidden = true;
+                }
+                if (clearBtn instanceof HTMLElement) {
+                    clearBtn.hidden = true;
+                }
+                if (previewLink instanceof HTMLAnchorElement) {
+                    previewLink.hidden = true;
+                    previewLink.textContent = '';
+                    previewLink.href = '#';
+                }
+            }
+
+            if (!enabled) {
+                const clearBtn = block.querySelector('[data-slot-clear]');
+                if (clearBtn instanceof HTMLButtonElement) {
+                    clearBtn.click();
+                }
+            }
+
+            planningDebug('slotToggle sync', {
+                slotKey: block.getAttribute('data-slot-key'),
+                enabled,
+                hasRecipe,
+                blockClass: block.className,
+                bodyHiddenAttr: body instanceof HTMLElement ? body.hasAttribute('hidden') : null,
+                bodyHiddenProp: body instanceof HTMLElement ? body.hidden : null,
+                bodyDisplayInline: body instanceof HTMLElement ? body.style.display : null,
+                bodyDisplayComputed: body instanceof HTMLElement ? window.getComputedStyle(body).display : null,
+            });
+
             block.querySelectorAll('[data-planning-autocomplete]').forEach((picker) => {
                 picker.classList.toggle('is-disabled', !enabled);
             });
@@ -432,6 +967,42 @@ function initPlanningSlotToggles() {
     });
 }
 
-document.querySelectorAll('.planning-page').forEach(initPlanningAutocomplete);
-initPlanningSaveForm();
-initPlanningSlotToggles();
+function bootPlanningPage() {
+    planningDebug('bootPlanningPage', {
+        readyState: document.readyState,
+        planningPages: document.querySelectorAll('.planning-page').length,
+        slotToggles: document.querySelectorAll('[data-slot-toggle]').length,
+    });
+    document.querySelectorAll('.planning-page').forEach((pageRoot) => {
+        try {
+            initPlanningAutocomplete(pageRoot);
+        } catch {
+            // L'autocomplete des créneaux est optionnel : ne pas bloquer la bibliothèque.
+        }
+        initPlanningRecipeLibrary(pageRoot);
+    });
+    initPlanningSaveForm();
+    initPlanningSlotToggles();
+}
+
+function safeBootPlanningPage(source) {
+    try {
+        document.documentElement.setAttribute('data-miam-planning-boot', source);
+        bootPlanningPage();
+        upsertPlanningDebugBadge(`planning OK (${source})`);
+    } catch (error) {
+        console.error('[planning] boot error', error);
+        upsertPlanningDebugBadge(
+            `planning ERR (${source}) ${error instanceof Error ? error.message : 'unknown'}`,
+            true
+        );
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => safeBootPlanningPage('domcontentloaded'));
+} else {
+    safeBootPlanningPage('immediate');
+}
+window.addEventListener('load', () => safeBootPlanningPage('window-load'));
+document.addEventListener('turbo:load', () => safeBootPlanningPage('turbo-load'));

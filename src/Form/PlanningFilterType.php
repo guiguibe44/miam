@@ -53,6 +53,7 @@ class PlanningFilterType extends AbstractType
             'data_class' => PlanningCriteria::class,
             'method' => 'GET',
             'csrf_protection' => false,
+            'allow_extra_fields' => true,
         ]);
     }
 }

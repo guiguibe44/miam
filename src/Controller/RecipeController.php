@@ -6,7 +6,9 @@ namespace App\Controller;
 
 use App\Entity\Recipe;
 use App\Entity\Ingredient;
+use App\Entity\MealSlot;
 use App\Entity\RecipeIngredient;
+use App\Entity\WeeklyPlan;
 use App\Form\RecipeType;
 use App\Form\RecipeChoices;
 use App\Repository\RecipeRepository;
@@ -18,6 +20,7 @@ use App\Service\RecipeSchemaOrgImporter;
 use App\Service\RecipeWeb750gImporter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -30,11 +33,16 @@ class RecipeController extends AbstractController
     private const RECIPE_INDEX_PER_PAGE = 12;
 
     #[Route('', name: 'app_recipe_index', methods: ['GET'])]
-    public function index(Request $request, RecipeRepository $recipeRepository): Response
+    public function index(
+        Request $request,
+        RecipeRepository $recipeRepository,
+        EntityManagerInterface $entityManager,
+    ): Response
     {
         $listData = $this->computeRecipeListData($request, $recipeRepository);
+        $planningContext = $this->buildRecipePlanningContext($entityManager);
 
-        return $this->render('recipe/index.html.twig', array_merge($listData, [
+        return $this->render('recipe/index.html.twig', array_merge($listData, $planningContext, [
             'mainIngredientChoices' => RecipeChoices::mainIngredients(),
             'seasonalityChoices' => RecipeChoices::seasonality(),
             'difficultyChoices' => RecipeChoices::difficulties(),
@@ -72,15 +80,21 @@ class RecipeController extends AbstractController
     }
 
     #[Route('/api/list-fragment', name: 'app_recipe_api_list_fragment', methods: ['GET'])]
-    public function apiListFragment(Request $request, RecipeRepository $recipeRepository): JsonResponse
+    public function apiListFragment(
+        Request $request,
+        RecipeRepository $recipeRepository,
+        EntityManagerInterface $entityManager,
+    ): JsonResponse
     {
         $listData = $this->computeRecipeListData($request, $recipeRepository);
+        $planningContext = $this->buildRecipePlanningContext($entityManager);
 
         $html = $this->renderView('recipe/_list_main.html.twig', [
             'recipes' => $listData['recipes'],
             'pagination' => $listData['pagination'],
             'filter_query' => $listData['filter_query'],
             'hasActiveFilters' => $listData['hasActiveFilters'],
+            'planningSuggestion' => $planningContext['planningSuggestion'],
         ]);
 
         return $this->json(['html' => $html]);
@@ -131,25 +145,52 @@ class RecipeController extends AbstractController
     #[Route('/{id}/modifier', name: 'app_recipe_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, Recipe $recipe, EntityManagerInterface $entityManager, RecipeRepository $recipeRepository, ImageUploader $imageUploader): Response
     {
+        $wantsAutoSaveJson = $request->headers->get('X-Recipe-Auto-Save') === '1';
         $form = $this->createForm(RecipeType::class, $recipe);
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            if ($this->hasDuplicateRecipe($recipeRepository, $recipe, $recipe->getId())) {
-                $this->addFlash('error', 'Une recette avec le meme nom et la meme URL existe deja.');
+        if ($form->isSubmitted()) {
+            if ($form->isValid()) {
+                if ($this->hasDuplicateRecipe($recipeRepository, $recipe, $recipe->getId())) {
+                    if ($wantsAutoSaveJson) {
+                        return $this->json(
+                            [
+                                'saved' => false,
+                                'message' => 'Une recette avec le meme nom et la meme URL existe deja.',
+                            ],
+                            Response::HTTP_CONFLICT
+                        );
+                    }
 
-                return $this->render('recipe/form.html.twig', [
-                    'recipe' => $recipe,
-                    'form' => $form,
-                    'pageTitle' => sprintf('Modifier "%s"', $recipe->getName()),
-                ]);
+                    $this->addFlash('error', 'Une recette avec le meme nom et la meme URL existe deja.');
+
+                    return $this->render('recipe/form.html.twig', [
+                        'recipe' => $recipe,
+                        'form' => $form,
+                        'pageTitle' => sprintf('Modifier "%s"', $recipe->getName()),
+                    ]);
+                }
+
+                $this->syncIngredients($recipe, $entityManager);
+                $this->handleImageUpload($form->get('imageFile')->getData(), $recipe, $imageUploader);
+                $entityManager->flush();
+
+                if ($wantsAutoSaveJson) {
+                    return $this->json(['saved' => true]);
+                }
+
+                return $this->redirectToRoute('app_recipe_index');
             }
 
-            $this->syncIngredients($recipe, $entityManager);
-            $this->handleImageUpload($form->get('imageFile')->getData(), $recipe, $imageUploader);
-            $entityManager->flush();
-
-            return $this->redirectToRoute('app_recipe_index');
+            if ($wantsAutoSaveJson) {
+                return $this->json(
+                    [
+                        'saved' => false,
+                        'errors' => $this->collectFormErrorMessages($form),
+                    ],
+                    Response::HTTP_UNPROCESSABLE_ENTITY
+                );
+            }
         }
 
         return $this->render('recipe/form.html.twig', [
@@ -160,11 +201,94 @@ class RecipeController extends AbstractController
     }
 
     #[Route('/{id}', name: 'app_recipe_show', methods: ['GET'])]
-    public function show(Recipe $recipe): Response
+    public function show(Recipe $recipe, EntityManagerInterface $entityManager): Response
     {
+        $planningContext = $this->buildRecipePlanningContext($entityManager);
+
         return $this->render('recipe/show.html.twig', [
             'recipe' => $recipe,
+            'planningWeeks' => $planningContext['planningWeeks'],
+            'mealTypeChoices' => $planningContext['mealTypeChoices'],
+            'weekdayChoices' => $planningContext['weekdayChoices'],
+            'planningSuggestion' => $planningContext['planningSuggestion'],
+            'availableSlotsByWeek' => $planningContext['availableSlotsByWeek'],
         ]);
+    }
+
+    #[Route('/{id}/planifier', name: 'app_recipe_plan', methods: ['POST'])]
+    public function plan(
+        Request $request,
+        Recipe $recipe,
+        EntityManagerInterface $entityManager,
+    ): Response {
+        if (!$this->isCsrfTokenValid('recipe_plan_'.$recipe->getId(), (string) $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Jeton CSRF invalide.');
+        }
+
+        $weekStartRaw = trim((string) $request->request->get('week_start'));
+        $slotChoice = trim((string) $request->request->get('slot_choice'));
+        $mealType = trim((string) $request->request->get('meal_type'));
+        $weekday = (int) $request->request->get('weekday', 1);
+
+        if ($slotChoice !== '' && preg_match('/^([1-7])\|(midi|soir)$/', $slotChoice, $m) === 1) {
+            $weekday = (int) $m[1];
+            $mealType = $m[2];
+        }
+
+        $weekStart = $this->parseWeekStart($weekStartRaw);
+        if ($weekStart === null) {
+            $this->addFlash('error', 'Semaine invalide.');
+
+            return $this->redirectToRoute('app_recipe_show', ['id' => $recipe->getId()]);
+        }
+
+        if (!in_array($mealType, [MealSlot::MEAL_TYPE_LUNCH, MealSlot::MEAL_TYPE_DINNER], true)) {
+            $this->addFlash('error', 'Type de repas invalide.');
+
+            return $this->redirectToRoute('app_recipe_show', ['id' => $recipe->getId()]);
+        }
+
+        if ($weekday < 1 || $weekday > 7) {
+            $this->addFlash('error', 'Jour invalide.');
+
+            return $this->redirectToRoute('app_recipe_show', ['id' => $recipe->getId()]);
+        }
+
+        $servedOn = $weekStart->modify('+'.($weekday - 1).' days');
+        $weeklyPlan = $this->findOrCreatePlan($entityManager, $weekStart);
+
+        $mealSlot = $entityManager->getRepository(MealSlot::class)->findOneBy([
+            'weeklyPlan' => $weeklyPlan,
+            'servedOn' => $servedOn,
+            'mealType' => $mealType,
+        ]);
+
+        if (!$mealSlot instanceof MealSlot) {
+            $mealSlot = (new MealSlot())
+                ->setWeeklyPlan($weeklyPlan)
+                ->setServedOn($servedOn)
+                ->setMealType($mealType);
+            $entityManager->persist($mealSlot);
+        }
+
+        $previousRecipeId = $mealSlot->getRecipe()?->getId();
+        $mealSlot->setRecipe($recipe);
+
+        if ($previousRecipeId !== $recipe->getId()) {
+            $recipe
+                ->incrementPlanningSelectionCount()
+                ->setPlanningLastSelectedAt(new \DateTimeImmutable('now'));
+        }
+
+        $entityManager->flush();
+
+        $mealTypeLabel = $mealType === MealSlot::MEAL_TYPE_LUNCH ? 'midi' : 'soir';
+        $this->addFlash(
+            'success',
+            sprintf('Recette ajoutée à la planification du %s (%s, %s).', $servedOn->format('d/m/Y'), $this->weekdayChoices()[$weekday], $mealTypeLabel)
+        );
+
+        return $this->redirectToRoute('app_recipe_show', ['id' => $recipe->getId()]);
     }
 
     #[Route('/{id}/supprimer', name: 'app_recipe_delete', methods: ['POST'])]
@@ -719,6 +843,309 @@ class RecipeController extends AbstractController
         return $recipeRepository->findDuplicateByNameAndSourceUrl($recipe->getName(), $recipe->getSourceUrl(), $excludeId) !== null;
     }
 
+    /**
+     * @return array{
+     *   planningWeeks: list<array{weekStart: string, label: string}>,
+     *   weekdayChoices: array<int, string>,
+     *   mealTypeChoices: array<string, string>,
+     *   planningSuggestion: array{weekStart: string, weekday: int, mealType: string, label: string},
+     *   availableSlotsByWeek: array<string, list<array{value: string, label: string}>>,
+     *   dayMealsByWeek: array<string, array<string, list<array{mealType: string, mealLabel: string, recipeName: ?string}>>>
+     * }
+     */
+    private function buildRecipePlanningContext(EntityManagerInterface $entityManager): array
+    {
+        $weekdayChoices = $this->weekdayChoices();
+        $mealTypeChoices = [
+            MealSlot::MEAL_TYPE_LUNCH => 'Midi',
+            MealSlot::MEAL_TYPE_DINNER => 'Soir',
+        ];
+        $planningWeeks = $this->buildPlanningWeekOptions($entityManager);
+        $availableSlotsByWeek = $this->buildAvailableFreeSlotsByWeek($entityManager, $planningWeeks);
+        $dayMealsByWeek = $this->buildDayMealsByWeek($entityManager, $planningWeeks);
+        $planningSuggestion = $this->findSuggestedFreeSlot($entityManager);
+
+        return [
+            'planningWeeks' => $planningWeeks,
+            'weekdayChoices' => $weekdayChoices,
+            'mealTypeChoices' => $mealTypeChoices,
+            'planningSuggestion' => $planningSuggestion,
+            'availableSlotsByWeek' => $availableSlotsByWeek,
+            'dayMealsByWeek' => $dayMealsByWeek,
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function weekdayChoices(): array
+    {
+        return [
+            1 => 'Lundi',
+            2 => 'Mardi',
+            3 => 'Mercredi',
+            4 => 'Jeudi',
+            5 => 'Vendredi',
+            6 => 'Samedi',
+            7 => 'Dimanche',
+        ];
+    }
+
+    /**
+     * @return list<array{weekStart: string, label: string}>
+     */
+    private function buildPlanningWeekOptions(EntityManagerInterface $entityManager): array
+    {
+        $todayMonday = $this->mondayContaining(new \DateTimeImmutable('today'));
+        $optionsByKey = [];
+
+        $plans = $entityManager->getRepository(WeeklyPlan::class)->findBy([], ['weekStartAt' => 'ASC'], 24);
+        foreach ($plans as $plan) {
+            if (!$plan instanceof WeeklyPlan) {
+                continue;
+            }
+            $weekStart = $plan->getWeekStartAt()->setTime(0, 0, 0);
+            if ($weekStart < $todayMonday->modify('-56 days')) {
+                continue;
+            }
+            $optionsByKey[$weekStart->format('Y-m-d')] = $weekStart;
+        }
+
+        if ($optionsByKey === []) {
+            for ($i = 0; $i < 4; ++$i) {
+                $weekStart = $todayMonday->modify('+'.(7 * $i).' days');
+                $optionsByKey[$weekStart->format('Y-m-d')] = $weekStart;
+            }
+        }
+
+        ksort($optionsByKey);
+        $out = [];
+        foreach ($optionsByKey as $key => $weekStart) {
+            $weekEnd = $weekStart->modify('+6 days');
+            $isExisting = $entityManager->getRepository(WeeklyPlan::class)->findOneBy(['weekStartAt' => $weekStart]) instanceof WeeklyPlan;
+            $out[] = [
+                'weekStart' => $key,
+                'label' => sprintf(
+                    'Semaine du %s au %s%s',
+                    $weekStart->format('d/m/Y'),
+                    $weekEnd->format('d/m/Y'),
+                    $isExisting ? '' : ' (nouvelle)'
+                ),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{weekStart: string, weekday: int, mealType: string, label: string}
+     */
+    private function findSuggestedFreeSlot(EntityManagerInterface $entityManager): array
+    {
+        $today = (new \DateTimeImmutable('today'))->setTime(0, 0, 0);
+        $nowHour = (int) (new \DateTimeImmutable('now'))->format('H');
+        $defaultMealType = $nowHour < 15 ? MealSlot::MEAL_TYPE_LUNCH : MealSlot::MEAL_TYPE_DINNER;
+
+        $plans = $entityManager->getRepository(WeeklyPlan::class)->findBy([], ['weekStartAt' => 'ASC'], 24);
+        foreach ($plans as $plan) {
+            if (!$plan instanceof WeeklyPlan) {
+                continue;
+            }
+
+            $weekStart = $plan->getWeekStartAt()->setTime(0, 0, 0);
+            if ($weekStart->modify('+6 days') < $today) {
+                continue;
+            }
+
+            $slotsByKey = [];
+            foreach ($plan->getMealSlots() as $slot) {
+                $slotsByKey[$slot->getServedOn()->format('Y-m-d').'_'.$slot->getMealType()] = $slot;
+            }
+
+            for ($i = 0; $i < 7; ++$i) {
+                $servedOn = $weekStart->modify('+'.$i.' days');
+                if ($servedOn < $today) {
+                    continue;
+                }
+                foreach ([MealSlot::MEAL_TYPE_LUNCH, MealSlot::MEAL_TYPE_DINNER] as $mealType) {
+                    $slotKey = $servedOn->format('Y-m-d').'_'.$mealType;
+                    $slot = $slotsByKey[$slotKey] ?? null;
+                    if (!$slot instanceof MealSlot || $slot->getRecipe() === null) {
+                        $weekday = (int) $servedOn->format('N');
+                        $mealLabel = $mealType === MealSlot::MEAL_TYPE_LUNCH ? 'midi' : 'soir';
+
+                        return [
+                            'weekStart' => $weekStart->format('Y-m-d'),
+                            'weekday' => $weekday,
+                            'mealType' => $mealType,
+                            'label' => sprintf('Créneau conseillé : %s %s', $this->weekdayChoices()[$weekday], $mealLabel),
+                        ];
+                    }
+                }
+            }
+        }
+
+        $fallbackDate = $today;
+        $weekday = (int) $fallbackDate->format('N');
+        $weekStart = $this->mondayContaining($fallbackDate);
+        $mealLabel = $defaultMealType === MealSlot::MEAL_TYPE_LUNCH ? 'midi' : 'soir';
+
+        return [
+            'weekStart' => $weekStart->format('Y-m-d'),
+            'weekday' => $weekday,
+            'mealType' => $defaultMealType,
+            'label' => sprintf('Créneau conseillé : %s %s', $this->weekdayChoices()[$weekday], $mealLabel),
+        ];
+    }
+
+    /**
+     * @param list<array{weekStart: string, label: string}> $planningWeeks
+     *
+     * @return array<string, list<array{value: string, label: string, readonly: bool}>>
+     */
+    private function buildAvailableFreeSlotsByWeek(EntityManagerInterface $entityManager, array $planningWeeks): array
+    {
+        $out = [];
+
+        foreach ($planningWeeks as $weekOption) {
+            $weekStart = $this->parseWeekStart((string) $weekOption['weekStart']);
+            if (!$weekStart instanceof \DateTimeImmutable) {
+                continue;
+            }
+
+            $plan = $entityManager->getRepository(WeeklyPlan::class)->findOneBy(['weekStartAt' => $weekStart]);
+            if (!$plan instanceof WeeklyPlan) {
+                $out[$weekStart->format('Y-m-d')] = [];
+
+                continue;
+            }
+
+            $slots = [];
+            foreach ($plan->getMealSlots() as $mealSlot) {
+                $weekday = (int) $mealSlot->getServedOn()->format('N');
+                $mealType = $mealSlot->getMealType();
+                if (!isset($this->weekdayChoices()[$weekday])) {
+                    continue;
+                }
+                if (!in_array($mealType, [MealSlot::MEAL_TYPE_LUNCH, MealSlot::MEAL_TYPE_DINNER], true)) {
+                    continue;
+                }
+                $mealLabel = $mealType === MealSlot::MEAL_TYPE_LUNCH ? 'midi' : 'soir';
+                $recipeName = $mealSlot->getRecipe()?->getName();
+                $slots[] = [
+                    'value' => $weekday.'|'.$mealType,
+                    'label' => $this->weekdayChoices()[$weekday].' — '.$mealLabel.(
+                        $recipeName !== null ? ' (déjà planifiée : '.$recipeName.')' : ' (libre)'
+                    ),
+                    'readonly' => $recipeName !== null,
+                ];
+            }
+
+            usort(
+                $slots,
+                static fn (array $a, array $b): int => strcmp($a['value'], $b['value'])
+            );
+
+            $out[$weekStart->format('Y-m-d')] = array_values(
+                array_unique($slots, SORT_REGULAR)
+            );
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<array{weekStart: string, label: string}> $planningWeeks
+     *
+     * @return array<string, array<string, list<array{mealType: string, mealLabel: string, recipeName: ?string}>>>
+     */
+    private function buildDayMealsByWeek(EntityManagerInterface $entityManager, array $planningWeeks): array
+    {
+        $out = [];
+
+        foreach ($planningWeeks as $weekOption) {
+            $weekStart = $this->parseWeekStart((string) $weekOption['weekStart']);
+            if (!$weekStart instanceof \DateTimeImmutable) {
+                continue;
+            }
+
+            $weekKey = $weekStart->format('Y-m-d');
+            $out[$weekKey] = [];
+
+            $plan = $entityManager->getRepository(WeeklyPlan::class)->findOneBy(['weekStartAt' => $weekStart]);
+            if (!$plan instanceof WeeklyPlan) {
+                continue;
+            }
+
+            foreach ($plan->getMealSlots() as $mealSlot) {
+                $weekday = (int) $mealSlot->getServedOn()->format('N');
+                if ($weekday < 1 || $weekday > 7) {
+                    continue;
+                }
+
+                $mealType = $mealSlot->getMealType();
+                if (!in_array($mealType, [MealSlot::MEAL_TYPE_LUNCH, MealSlot::MEAL_TYPE_DINNER], true)) {
+                    continue;
+                }
+
+                $dayKey = (string) $weekday;
+                if (!isset($out[$weekKey][$dayKey])) {
+                    $out[$weekKey][$dayKey] = [];
+                }
+
+                $out[$weekKey][$dayKey][] = [
+                    'mealType' => $mealType,
+                    'mealLabel' => $mealType === MealSlot::MEAL_TYPE_LUNCH ? 'Midi' : 'Soir',
+                    'recipeName' => $mealSlot->getRecipe()?->getName(),
+                ];
+            }
+
+            foreach ($out[$weekKey] as $dayKey => $rows) {
+                usort(
+                    $rows,
+                    static fn (array $a, array $b): int => strcmp((string) $a['mealType'], (string) $b['mealType'])
+                );
+                $out[$weekKey][$dayKey] = $rows;
+            }
+        }
+
+        return $out;
+    }
+
+    private function parseWeekStart(string $weekStart): ?\DateTimeImmutable
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $weekStart)) {
+            return null;
+        }
+
+        try {
+            return (new \DateTimeImmutable($weekStart))->setTime(0, 0, 0);
+        } catch (\Exception) {
+            return null;
+        }
+    }
+
+    private function mondayContaining(\DateTimeImmutable $date): \DateTimeImmutable
+    {
+        $dow = (int) $date->format('N');
+
+        return $date->modify('-'.($dow - 1).' days')->setTime(0, 0, 0);
+    }
+
+    private function findOrCreatePlan(EntityManagerInterface $entityManager, \DateTimeImmutable $weekStart): WeeklyPlan
+    {
+        /** @var WeeklyPlan|null $plan */
+        $plan = $entityManager->getRepository(WeeklyPlan::class)->findOneBy(['weekStartAt' => $weekStart]);
+        if ($plan instanceof WeeklyPlan) {
+            return $plan;
+        }
+
+        $plan = (new WeeklyPlan())->setWeekStartAt($weekStart);
+        $entityManager->persist($plan);
+
+        return $plan;
+    }
+
     private function syncIngredients(Recipe $recipe, EntityManagerInterface $entityManager): void
     {
         foreach ($recipe->getRecipeIngredients() as $line) {
@@ -749,5 +1176,18 @@ class RecipeController extends AbstractController
         if ($imageFile instanceof UploadedFile) {
             $recipe->setImageUrl($imageUploader->upload($imageFile));
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function collectFormErrorMessages(FormInterface $form): array
+    {
+        $messages = [];
+        foreach ($form->getErrors(true) as $error) {
+            $messages[] = $error->getMessage();
+        }
+
+        return $messages;
     }
 }

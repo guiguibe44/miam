@@ -243,6 +243,54 @@ body.app-body {
     border: 1px solid rgba(234, 88, 12, 0.22);
 }
 
+/* Message éphémère (sauvegarde auto formulaire recette) */
+.app-toast-host {
+    position: fixed;
+    left: 50%;
+    bottom: clamp(1rem, 4vw, 2rem);
+    transform: translateX(-50%);
+    z-index: 4000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    pointer-events: none;
+}
+
+.app-toast {
+    margin: 0;
+    padding: 0.65rem 1.15rem;
+    border-radius: var(--radius-md);
+    font-size: 0.92rem;
+    font-weight: 600;
+    box-shadow: var(--shadow-md);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.app-toast--in {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.app-toast--leaving {
+    opacity: 0;
+    transform: translateY(4px);
+}
+
+.app-toast--success {
+    background: var(--color-bg-elevated);
+    color: var(--color-success-text);
+    border: 1px solid rgba(4, 120, 87, 0.2);
+}
+
+.app-toast--error {
+    background: var(--color-bg-elevated);
+    color: var(--color-error-text);
+    border: 1px solid rgba(185, 28, 28, 0.18);
+}
+
 .link-row {
     display: flex;
     flex-wrap: wrap;
@@ -928,11 +976,27 @@ form [id$="_mealTypes"] label {
 .recipe-card__actions {
     margin-top: auto;
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
-    padding-top: 0.5rem;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding-top: 0.6rem;
     border-top: 1px solid var(--color-border);
+}
+
+.recipe-card__actions-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    align-items: center;
+}
+
+.recipe-card__actions-line--primary {
+    justify-content: space-between;
+}
+
+.recipe-card__plan-btn {
+    flex: 1;
+    justify-content: center;
+    min-width: min(100%, 12rem);
 }
 
 .recipe-card__actions form {
@@ -1032,6 +1096,363 @@ form [id$="_mealTypes"] label {
     gap: 1.15rem;
 }
 
+.planning-board {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 1080px) {
+    .planning-board {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(260px, 300px);
+        align-items: start;
+    }
+
+    .planning-board__days {
+        grid-column: 1 / span 2;
+    }
+
+    .planning-board__recipes {
+        grid-column: 3;
+    }
+}
+
+.planning-board__recipes {
+    position: sticky;
+    top: 5.2rem;
+    margin-bottom: 0;
+}
+
+.planning-board__days .section-title {
+    margin-top: 0;
+}
+
+.planning-library-list {
+    margin-top: 0.75rem;
+    display: grid;
+    gap: 0.5rem;
+    max-height: min(72vh, 920px);
+    overflow-y: auto;
+    padding-right: 0.2rem;
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 1080px) {
+    .planning-library-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.planning-library-item {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-subtle);
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 0.55rem;
+    padding: 0.45rem;
+    cursor: grab;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+
+.planning-library-item:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--color-accent) 26%, var(--color-border));
+}
+
+.planning-library-item.is-dragging {
+    opacity: 0.6;
+}
+
+.planning-library-item.is-active {
+    border-color: var(--color-accent);
+    background: var(--color-accent-subtle);
+}
+
+.planning-pick-modal {
+    border: none;
+    background: transparent;
+    padding: 0;
+    width: min(34rem, calc(100vw - 1.2rem));
+}
+
+.planning-pick-modal::backdrop {
+    background: rgba(28, 25, 23, 0.45);
+}
+
+.planning-pick-modal__backdrop {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    border: none;
+    padding: 0;
+    background: transparent;
+}
+
+.planning-pick-modal__card {
+    margin: 10vh auto 0;
+    width: min(34rem, calc(100vw - 1.2rem));
+}
+
+.planning-pick-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.planning-pick-modal__header .card__title {
+    margin: 0;
+}
+
+.planning-pick-modal__actions {
+    margin: 0.85rem 0 0;
+}
+
+.planning-recipe-modal {
+    border: none;
+    background: transparent;
+    padding: 0;
+    width: min(86rem, calc(100vw - 1.2rem));
+}
+
+.planning-recipe-modal::backdrop {
+    background: rgba(28, 25, 23, 0.55);
+}
+
+.planning-recipe-modal__backdrop {
+    position: fixed;
+    inset: 0;
+}
+
+.planning-recipe-modal__card {
+    margin: 3vh auto 0;
+    width: min(86rem, calc(100vw - 1.2rem));
+    height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.planning-recipe-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+}
+
+.planning-recipe-modal__header .card__title {
+    margin: 0;
+}
+
+.planning-recipe-modal__frame {
+    width: 100%;
+    flex: 1;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: #fff;
+}
+
+/* Page planification en largeur viewport (desktop). */
+.planning-page--wide {
+    width: 100%;
+}
+
+.planning-library-item__thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.planning-library-item__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.planning-library-item__thumb-empty {
+    font-size: 1rem;
+    opacity: 0.55;
+}
+
+.planning-library-item__body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.planning-library-item__body strong {
+    font-size: 0.9rem;
+    line-height: 1.25;
+}
+
+.planning-library-item__body a {
+    color: var(--color-accent);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.planning-library-item__body a:hover {
+    text-decoration: underline;
+}
+
+.planning-library-item__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+}
+
+.planning-library-item__actions .btn {
+    font-size: 0.78rem;
+    padding: 0.38rem 0.55rem;
+}
+
+.planning-recipe-modal {
+    border: none;
+    background: transparent;
+    padding: 0;
+    width: min(86rem, calc(100vw - 1.2rem));
+}
+
+.planning-recipe-modal::backdrop {
+    background: rgba(28, 25, 23, 0.55);
+}
+
+.planning-recipe-modal__backdrop {
+    position: fixed;
+    inset: 0;
+}
+
+.planning-recipe-modal__card {
+    margin: 3vh auto 0;
+    width: min(86rem, calc(100vw - 1.2rem));
+    height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.planning-recipe-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+}
+
+.planning-recipe-modal__header .card__title {
+    margin: 0;
+}
+
+.planning-recipe-modal__frame {
+    width: 100%;
+    flex: 1;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: #fff;
+}
+
+.planning-library-item__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+}
+
+.planning-library-item__actions .btn {
+    font-size: 0.78rem;
+    padding: 0.38rem 0.55rem;
+}
+
+.planning-rebuild-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+.planning-rebuild-left {
+    order: 2;
+}
+
+.planning-rebuild-right {
+    order: 1;
+}
+
+.planning-rebuild-bottom {
+    margin-top: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+@media (min-width: 1080px) {
+    .planning-page--wide {
+        width: calc(100vw - 2 * var(--space));
+        max-width: calc(100vw - 2 * var(--space));
+        margin-left: calc(50% - 50vw + var(--space));
+        margin-right: 0;
+    }
+
+    .planning-rebuild-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: start;
+        gap: 1.35rem;
+    }
+
+    .planning-rebuild-left {
+        order: 1;
+        position: sticky;
+        top: 5.2rem;
+        margin-bottom: 0;
+    }
+
+    .planning-rebuild-right {
+        order: 2;
+        min-width: 0;
+    }
+}
+
+.planning-rebuild-right > .section-title {
+    margin: 0 0 0.75rem;
+    font-size: 1.25rem;
+}
+
+@media (min-width: 960px) {
+    .planning-rebuild-right .plan-day-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+}
+
+.planning-rebuild-bottom .card__title {
+    margin-bottom: 0.35rem;
+}
+
+.planning-rebuild-bottom .planning-setup-actions {
+    margin-top: 0.2rem;
+}
+
+.planning-rebuild-bottom .planning-save-bar__actions {
+    margin: 0.25rem 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+}
+
+@media (max-width: 759px) {
+    .planning-rebuild-bottom .planning-save-bar__actions .btn {
+        width: 100%;
+    }
+}
+
 .plan-day-card {
     background: var(--color-bg-elevated);
     border: 1px solid var(--color-border);
@@ -1048,7 +1469,7 @@ form [id$="_mealTypes"] label {
 
 .plan-day-card__header {
     padding: 0.9rem 1.15rem;
-    background: linear-gradient(135deg, var(--color-accent-subtle), transparent);
+    background: #faf8f5;
     border-bottom: 1px solid var(--color-border);
     display: flex;
     align-items: center;
@@ -1072,12 +1493,21 @@ form [id$="_mealTypes"] label {
 }
 
 .plan-meal-block__title {
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--color-accent-hover);
-    margin: 0 0 0.35rem;
+    letter-spacing: 0.06em;
+    margin: 0;
+    line-height: 1.25;
+    font-family: var(--font-sans);
+}
+
+.plan-meal-block:not(.is-disabled) .plan-meal-block__title {
+    color: #c2410c;
+}
+
+.plan-meal-block.is-disabled .plan-meal-block__title {
+    color: color-mix(in srgb, #ea580c 38%, var(--color-text-muted));
 }
 
 .plan-meal-block__head {
@@ -1085,6 +1515,20 @@ form [id$="_mealTypes"] label {
     align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
+}
+
+.plan-meal-block > .plan-meal-block__body {
+    display: block;
+    margin-top: 0.5rem;
+}
+
+/* Créneau actif/inactif : règles explicites, plus robustes sur Firefox */
+.plan-meal-block:not(.is-disabled) .plan-meal-block__body {
+    display: block !important;
+}
+
+.plan-meal-block.is-disabled .plan-meal-block__body {
+    display: none !important;
 }
 
 .plan-meal-block {
@@ -1137,15 +1581,6 @@ form [id$="_mealTypes"] label {
     transform: translateX(0.68rem);
 }
 
-.plan-meal-block.is-disabled {
-    opacity: 0.58;
-}
-
-.plan-meal-block.is-disabled .plan-autocomplete__input {
-    cursor: not-allowed;
-    background: #f5f5f4;
-}
-
 .plan-meal-block__current {
     margin: 0 0 0.5rem;
     font-size: 0.88rem;
@@ -1157,6 +1592,146 @@ form [id$="_mealTypes"] label {
     z-index: 20;
 }
 
+.plan-dropzone {
+    position: relative;
+    width: 100%;
+    border: 2px dashed #d4d0cd;
+    border-radius: var(--radius-md);
+    background: #faf9f7;
+    color: var(--color-text-muted);
+    transition: box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    overflow: hidden;
+}
+
+.plan-dropzone.has-recipe {
+    color: var(--color-text);
+    background: #ffffff;
+    border: 1px solid #e5e4e0;
+}
+
+.plan-dropzone__inner {
+    position: relative;
+    width: 100%;
+    min-height: 3.6rem;
+    box-sizing: border-box;
+    padding: 0.65rem 0.9rem 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Grille : la croix partage la cellule avec la recette (coin haut droit, sans absolute capricieux) */
+.plan-dropzone.has-recipe .plan-dropzone__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    justify-items: stretch;
+}
+
+.plan-dropzone.has-recipe .plan-dropzone__recipe,
+.plan-dropzone.has-recipe .plan-dropzone__clear {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.plan-dropzone.has-recipe .plan-dropzone__recipe {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding-right: 2.25rem;
+    box-sizing: border-box;
+}
+
+.plan-dropzone.has-recipe .plan-dropzone__clear {
+    position: static;
+    justify-self: end;
+    align-self: start;
+    margin: 0;
+    width: 1.65rem;
+    height: 1.65rem;
+}
+
+.plan-dropzone__empty {
+    margin: 0;
+    font-size: 0.9rem;
+    text-align: center;
+    font-weight: 500;
+    width: 100%;
+}
+
+.plan-dropzone__recipe {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-width: 0;
+}
+
+.plan-dropzone__thumb {
+    flex-shrink: 0;
+    width: 4rem;
+    height: 4rem;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: #e7e5e2;
+}
+
+.plan-dropzone__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.plan-dropzone__title {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.3;
+    min-width: 0;
+    flex: 1;
+    align-self: center;
+    font-family: var(--font-sans);
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+a.plan-dropzone__title,
+a.plan-dropzone__title:visited {
+    color: var(--color-text) !important;
+    text-decoration: none !important;
+}
+
+.plan-dropzone__title:hover {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.plan-dropzone__clear {
+    appearance: none;
+    -webkit-appearance: none;
+    z-index: 2;
+    flex-shrink: 0;
+    padding: 0;
+    border: 1px solid rgba(120, 113, 108, 0.25);
+    border-radius: 6px;
+    background: rgba(120, 113, 108, 0.1);
+    color: #78716c;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.plan-dropzone__clear:hover {
+    background: rgba(185, 28, 28, 0.12);
+    color: var(--color-error-text);
+}
+
 @media (min-width: 720px) {
     .plan-meal-picker .plan-autocomplete {
         max-width: min(100%, 36rem);
@@ -1166,6 +1741,10 @@ form [id$="_mealTypes"] label {
 .plan-autocomplete {
     position: relative;
     z-index: 1;
+}
+
+.plan-meal-picker.is-drop-over .plan-dropzone {
+    box-shadow: 0 0 0 2px var(--color-accent), 0 6px 18px rgba(234, 88, 12, 0.14);
 }
 
 .plan-autocomplete__input {
@@ -1256,6 +1835,27 @@ form [id$="_mealTypes"] label {
 
 .planning-setup-card {
     margin-bottom: 1.5rem;
+}
+
+.planning-setup-details {
+    margin-bottom: 1.5rem;
+}
+
+.planning-setup-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.planning-setup-summary::-webkit-details-marker {
+    display: none;
+}
+
+.planning-setup-summary .card__title {
+    margin: 0;
 }
 
 .planning-history-card {
@@ -1530,6 +2130,60 @@ form [id$="_mealTypes"] label {
 .recipe-show-steps {
     white-space: normal;
     line-height: 1.55;
+}
+
+.recipe-plan-card {
+    margin-top: 1rem;
+}
+
+.recipe-plan-form {
+    display: grid;
+    gap: 0.8rem;
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 840px) {
+    .recipe-plan-form {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+        align-items: end;
+    }
+}
+
+.recipe-plan-modal {
+    border: none;
+    background: transparent;
+    padding: 0;
+    width: min(56rem, calc(100vw - 2rem));
+}
+
+.recipe-plan-modal::backdrop {
+    background: rgba(28, 25, 23, 0.45);
+}
+
+.recipe-plan-modal__card {
+    margin: 8vh auto 0;
+    width: min(56rem, calc(100vw - 2rem));
+}
+
+.recipe-plan-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.recipe-plan-modal__header .card__title {
+    margin: 0;
+}
+
+.recipe-plan-modal__suggestion {
+    margin-top: 0.25rem;
+}
+
+.recipe-plan-day-overview {
+    margin-top: 0.9rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--color-border);
 }
 
 .planning-next-item strong a:hover {

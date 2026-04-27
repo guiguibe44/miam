@@ -2,7 +2,23 @@
  * Liste recettes : mise à jour live de la grille selon le champ « nom » (debounce),
  * filtres via « Appliquer », pagination AJAX, historique (replaceState pour la saisie).
  */
+let recipeListPopstateCallback = null;
+let recipeListPopstateAttached = false;
+
+function attachRecipeListPopstateOnce() {
+    if (recipeListPopstateAttached) {
+        return;
+    }
+    recipeListPopstateAttached = true;
+    window.addEventListener('popstate', () => {
+        recipeListPopstateCallback?.();
+    });
+}
+
 function initRecipeListApp(root) {
+    if (root.dataset.miamRecipeListInit === '1') {
+        return;
+    }
     const fragmentUrl = root.dataset.fragmentUrl;
     const indexPath = root.dataset.indexPath || '/recettes';
     const form = root.querySelector('#recipe-filters-form');
@@ -13,7 +29,82 @@ function initRecipeListApp(root) {
         return;
     }
 
+    root.dataset.miamRecipeListInit = '1';
+
     let searchTimer = null;
+    const planModal = document.querySelector('[data-recipe-plan-modal]');
+    const planForm = planModal?.querySelector('[data-recipe-plan-form]');
+    const planTitle = planModal?.querySelector('[data-recipe-plan-title]');
+    const planToken = planModal?.querySelector('[data-recipe-plan-token]');
+    const planWeek = planModal?.querySelector('[data-recipe-plan-week]');
+    const planSlot = planModal?.querySelector('[data-recipe-plan-slot]');
+    const closeButtons = planModal ? planModal.querySelectorAll('[data-recipe-plan-close]') : [];
+    const planRouteTemplate = root.dataset.planRouteTemplate || '';
+    let availableSlotsByWeek = {};
+    try {
+        availableSlotsByWeek = JSON.parse(root.dataset.planAvailableSlots || '{}');
+    } catch (e) {
+        availableSlotsByWeek = {};
+    }
+
+    function syncSlotOptionsForWeek() {
+        if (!(planWeek instanceof HTMLSelectElement) || !(planSlot instanceof HTMLSelectElement)) {
+            return;
+        }
+        const slots = availableSlotsByWeek[planWeek.value] || [];
+        const previousValue = planSlot.value;
+        planSlot.innerHTML = '';
+        if (!Array.isArray(slots) || slots.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Aucun créneau libre pour cette planification';
+            planSlot.appendChild(option);
+            planSlot.value = '';
+            planSlot.disabled = true;
+
+            return;
+        }
+        const selectableValues = [];
+        slots.forEach((slot) => {
+            const option = document.createElement('option');
+            option.value = slot.value;
+            option.textContent = slot.label;
+            option.disabled = !!slot.readonly;
+            planSlot.appendChild(option);
+            if (!slot.readonly) {
+                selectableValues.push(slot.value);
+            }
+        });
+        if (selectableValues.length === 0) {
+            planSlot.value = '';
+            planSlot.disabled = true;
+
+            return;
+        }
+        planSlot.disabled = false;
+        const stillExists = selectableValues.includes(previousValue);
+        planSlot.value = stillExists ? previousValue : selectableValues[0];
+    }
+
+    function closePlanModal() {
+        if (planModal && typeof planModal.close === 'function' && planModal.open) {
+            planModal.close();
+        }
+    }
+
+    if (planModal) {
+        closeButtons.forEach((button) => {
+            button.addEventListener('click', closePlanModal);
+        });
+        planModal.addEventListener('click', (e) => {
+            if (e.target === planModal) {
+                closePlanModal();
+            }
+        });
+        if (planWeek instanceof HTMLSelectElement) {
+            planWeek.addEventListener('change', syncSlotOptionsForWeek);
+        }
+    }
 
     async function fetchFragment(queryString) {
         const url = queryString ? `${fragmentUrl}?${queryString}` : fragmentUrl;
@@ -101,6 +192,29 @@ function initRecipeListApp(root) {
     });
 
     results.addEventListener('click', (e) => {
+        const planOpen = e.target.closest('[data-recipe-plan-open]');
+        if (planOpen) {
+            if (!planModal || !planForm || !planTitle || !planToken || !planRouteTemplate) {
+                return;
+            }
+            const recipeId = planOpen.getAttribute('data-recipe-id');
+            const recipeName = planOpen.getAttribute('data-recipe-name') || 'Recette';
+            const token = planOpen.getAttribute('data-recipe-plan-token') || '';
+            if (!recipeId) {
+                return;
+            }
+
+            planTitle.textContent = `Recette : ${recipeName}`;
+            planToken.value = token;
+            planForm.setAttribute('action', planRouteTemplate.replace('__RECIPE_ID__', recipeId));
+            syncSlotOptionsForWeek();
+            if (typeof planModal.showModal === 'function') {
+                planModal.showModal();
+            }
+
+            return;
+        }
+
         const a = e.target.closest('nav.pagination a[href]');
         if (!a) {
             return;
@@ -124,10 +238,22 @@ function initRecipeListApp(root) {
         history.pushState({}, '', url.pathname + url.search);
     });
 
-    window.addEventListener('popstate', () => {
+    attachRecipeListPopstateOnce();
+    recipeListPopstateCallback = () => {
         applySearchToForm(window.location.search);
         fetchFragment(window.location.search.slice(1));
-    });
+    };
 }
 
-document.querySelectorAll('[data-recipe-list-app]').forEach(initRecipeListApp);
+function bootRecipeIndexPage() {
+    const roots = document.querySelectorAll('[data-recipe-list-app]');
+    if (roots.length === 0) {
+        recipeListPopstateCallback = null;
+
+        return;
+    }
+    roots.forEach(initRecipeListApp);
+}
+
+bootRecipeIndexPage();
+document.addEventListener('turbo:load', bootRecipeIndexPage);

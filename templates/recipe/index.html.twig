@@ -2,13 +2,6 @@
 
 {% block title %}Recettes — Miam{% endblock %}
 
-{% block javascripts %}
-    {{ importmap(['app', 'recipe_index']) }}
-    <script type="module">
-        import 'recipe_index';
-    </script>
-{% endblock %}
-
 {% block body %}
     <h1 class="app-page-title">Recettes</h1>
     <p class="app-lead">La liste se met à jour pendant que tu tapes le nom ; les autres filtres utilisent « Appliquer ». Imports Jow, 750g et URL (schema.org) sur la page dédiée.</p>
@@ -24,6 +17,8 @@
         data-recipe-list-app
         data-fragment-url="{{ path('app_recipe_api_list_fragment') }}"
         data-index-path="{{ path('app_recipe_index') }}"
+        data-plan-route-template="{{ path('app_recipe_plan', { id: '__RECIPE_ID__' }) }}"
+        data-plan-available-slots="{{ availableSlotsByWeek|json_encode|e('html_attr') }}"
     >
     <div class="recipe-list-layout">
         <aside class="recipe-sidebar" aria-label="Filtres">
@@ -159,6 +154,55 @@
         </div>
     </div>
     </div>
+
+    <dialog
+        class="recipe-plan-modal"
+        data-recipe-plan-modal
+        data-available-slots="{{ availableSlotsByWeek|json_encode|e('html_attr') }}"
+        data-day-meals="{{ dayMealsByWeek|json_encode|e('html_attr') }}"
+        data-weekdays="{{ weekdayChoices|json_encode|e('html_attr') }}"
+    >
+        <form method="post" class="card recipe-plan-modal__card" data-recipe-plan-form>
+            <input type="hidden" name="_token" value="" data-recipe-plan-token>
+            <header class="recipe-plan-modal__header">
+                <h2 class="card__title">Ajouter à la planification</h2>
+                <button type="button" class="btn btn--secondary btn--icon-only" data-recipe-plan-close aria-label="Fermer">×</button>
+            </header>
+            <p class="card__hint" data-recipe-plan-title>Recette</p>
+            <p class="muted recipe-plan-modal__suggestion" data-recipe-plan-suggestion>{{ planningSuggestion.label }}</p>
+            <div class="recipe-plan-form">
+                <div>
+                    <label for="modal_week_start">Planification</label>
+                    <select id="modal_week_start" name="week_start" required data-recipe-plan-week>
+                        {% for option in planningWeeks %}
+                            <option value="{{ option.weekStart }}" {{ option.weekStart == planningSuggestion.weekStart ? 'selected' : '' }}>{{ option.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="modal_slot_choice">Créneau actif libre</label>
+                    {% set suggestedSlot = planningSuggestion.weekday ~ '|' ~ planningSuggestion.mealType %}
+                    <select id="modal_slot_choice" name="slot_choice" required data-recipe-plan-slot>
+                        {% for slot in availableSlotsByWeek[planningSuggestion.weekStart]|default([]) %}
+                            <option
+                                value="{{ slot.value }}"
+                                data-readonly="{{ slot.readonly ? '1' : '0' }}"
+                                {{ slot.value == suggestedSlot and not slot.readonly ? 'selected' : '' }}
+                                {{ slot.readonly ? 'disabled' : '' }}
+                            >
+                                {{ slot.label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn--primary">Ajouter</button>
+            </div>
+            <div class="recipe-plan-day-overview" data-recipe-plan-day-overview>
+                <p class="muted" data-recipe-plan-day-title></p>
+                <ul class="planning-related-list" data-recipe-plan-day-list></ul>
+            </div>
+        </form>
+    </dialog>
 {% endblock %}
 
 {% block body_javascripts %}
@@ -183,6 +227,128 @@
 
             mq.addEventListener('change', sync);
             sync();
+        })();
+
+        (function () {
+            var modal = document.querySelector('[data-recipe-plan-modal]');
+            if (!modal) {
+                return;
+            }
+            var weekSelect = modal.querySelector('[data-recipe-plan-week]');
+            var slotSelect = modal.querySelector('[data-recipe-plan-slot]');
+            var dayTitle = modal.querySelector('[data-recipe-plan-day-title]');
+            var dayList = modal.querySelector('[data-recipe-plan-day-list]');
+            if (!weekSelect || !slotSelect) {
+                return;
+            }
+
+            var slotsByWeek = {};
+            var dayMealsByWeek = {};
+            var weekdays = {};
+            try {
+                slotsByWeek = JSON.parse(modal.getAttribute('data-available-slots') || '{}');
+            } catch (e) {
+                slotsByWeek = {};
+            }
+            try {
+                dayMealsByWeek = JSON.parse(modal.getAttribute('data-day-meals') || '{}');
+            } catch (e) {
+                dayMealsByWeek = {};
+            }
+            try {
+                weekdays = JSON.parse(modal.getAttribute('data-weekdays') || '{}');
+            } catch (e) {
+                weekdays = {};
+            }
+
+            function selectedDay() {
+                var raw = slotSelect.value || '';
+                if (raw.indexOf('|') === -1) {
+                    return '';
+                }
+                return raw.split('|')[0];
+            }
+
+            function renderDayOverview() {
+                if (!dayTitle || !dayList) {
+                    return;
+                }
+                var weekKey = weekSelect.value;
+                var dayKey = selectedDay();
+                dayList.innerHTML = '';
+                if (!weekKey || !dayKey) {
+                    dayTitle.textContent = '';
+                    return;
+                }
+
+                var dayLabel = weekdays[dayKey] || ('Jour ' + dayKey);
+                dayTitle.textContent = 'Repas déjà renseignés pour ' + dayLabel;
+
+                var rows = (((dayMealsByWeek || {})[weekKey] || {})[dayKey] || []);
+                if (!Array.isArray(rows) || rows.length === 0) {
+                    var empty = document.createElement('li');
+                    empty.className = 'planning-related-item';
+                    empty.innerHTML = '<span class="muted">Aucun créneau actif sur ce jour.</span>';
+                    dayList.appendChild(empty);
+                    return;
+                }
+
+                rows.forEach(function (row) {
+                    var li = document.createElement('li');
+                    li.className = 'planning-related-item';
+                    var mealLabel = row.mealLabel || row.mealType || 'Repas';
+                    var recipeLabel = row.recipeName ? row.recipeName : 'Libre';
+                    li.innerHTML = '<strong>' + mealLabel + '</strong><span class="muted"> — ' + recipeLabel + '</span>';
+                    dayList.appendChild(li);
+                });
+            }
+
+            function renderSlots() {
+                var weekKey = weekSelect.value;
+                var slots = slotsByWeek[weekKey] || [];
+                var previous = slotSelect.value;
+                slotSelect.innerHTML = '';
+
+                if (!Array.isArray(slots) || slots.length === 0) {
+                    var option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'Aucun créneau libre pour cette planification';
+                    slotSelect.appendChild(option);
+                    slotSelect.value = '';
+                    slotSelect.disabled = true;
+                    renderDayOverview();
+                    return;
+                }
+
+                var selectableValues = [];
+                slots.forEach(function (slot) {
+                    var option = document.createElement('option');
+                    option.value = slot.value;
+                    option.textContent = slot.label;
+                     option.disabled = !!slot.readonly;
+                    slotSelect.appendChild(option);
+                    if (!slot.readonly) {
+                        selectableValues.push(slot.value);
+                    }
+                });
+
+                if (selectableValues.length === 0) {
+                    slotSelect.value = '';
+                    slotSelect.disabled = true;
+                    renderDayOverview();
+                    return;
+                }
+
+                slotSelect.disabled = false;
+                var stillExists = selectableValues.indexOf(previous) !== -1;
+                slotSelect.value = stillExists ? previous : selectableValues[0];
+                renderDayOverview();
+            }
+
+            weekSelect.addEventListener('change', renderSlots);
+            slotSelect.addEventListener('change', renderDayOverview);
+            modal.addEventListener('close', renderSlots);
+            renderSlots();
         })();
     </script>
 {% endblock %}
