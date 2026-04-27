@@ -29,39 +29,6 @@ function buildMetaLine(item) {
     return parts.map(escapeHtml).join(' · ');
 }
 
-const MIAM_PLANNING_DEBUG = true;
-
-function planningDebug(...args) {
-    if (!MIAM_PLANNING_DEBUG) {
-        return;
-    }
-    console.log('[planning]', ...args);
-}
-
-function upsertPlanningDebugBadge(message, isError = false) {
-    if (!MIAM_PLANNING_DEBUG) {
-        return;
-    }
-    let el = document.getElementById('miam-planning-debug-badge');
-    if (!el) {
-        el = document.createElement('div');
-        el.id = 'miam-planning-debug-badge';
-        el.style.position = 'fixed';
-        el.style.top = '8px';
-        el.style.right = '8px';
-        el.style.zIndex = '99999';
-        el.style.padding = '6px 10px';
-        el.style.borderRadius = '8px';
-        el.style.font = '12px/1.3 monospace';
-        el.style.boxShadow = '0 2px 12px rgba(0,0,0,0.15)';
-        document.body.appendChild(el);
-    }
-    el.style.background = isError ? '#fee2e2' : '#dcfce7';
-    el.style.color = isError ? '#991b1b' : '#166534';
-    el.style.border = `1px solid ${isError ? '#fecaca' : '#bbf7d0'}`;
-    el.textContent = message;
-}
-
 function initPlanningAutocomplete(pageRoot) {
     if (pageRoot.dataset.miamPlanningAcInit === '1') {
         return;
@@ -878,17 +845,6 @@ function initPlanningSlotToggles() {
                 }
             }
 
-            planningDebug('slotToggle sync', {
-                slotKey: block.getAttribute('data-slot-key'),
-                enabled,
-                hasRecipe,
-                blockClass: block.className,
-                bodyHiddenAttr: body instanceof HTMLElement ? body.hasAttribute('hidden') : null,
-                bodyHiddenProp: body instanceof HTMLElement ? body.hidden : null,
-                bodyDisplayInline: body instanceof HTMLElement ? body.style.display : null,
-                bodyDisplayComputed: body instanceof HTMLElement ? window.getComputedStyle(body).display : null,
-            });
-
             block.querySelectorAll('[data-planning-autocomplete]').forEach((picker) => {
                 picker.classList.toggle('is-disabled', !enabled);
             });
@@ -968,11 +924,6 @@ function initPlanningSlotToggles() {
 }
 
 function bootPlanningPage() {
-    planningDebug('bootPlanningPage', {
-        readyState: document.readyState,
-        planningPages: document.querySelectorAll('.planning-page').length,
-        slotToggles: document.querySelectorAll('[data-slot-toggle]').length,
-    });
     document.querySelectorAll('.planning-page').forEach((pageRoot) => {
         try {
             initPlanningAutocomplete(pageRoot);
@@ -985,24 +936,10 @@ function bootPlanningPage() {
     initPlanningSlotToggles();
 }
 
-function safeBootPlanningPage(source) {
-    try {
-        document.documentElement.setAttribute('data-miam-planning-boot', source);
-        bootPlanningPage();
-        upsertPlanningDebugBadge(`planning OK (${source})`);
-    } catch (error) {
-        console.error('[planning] boot error', error);
-        upsertPlanningDebugBadge(
-            `planning ERR (${source}) ${error instanceof Error ? error.message : 'unknown'}`,
-            true
-        );
-    }
-}
-
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => safeBootPlanningPage('domcontentloaded'));
+    document.addEventListener('DOMContentLoaded', bootPlanningPage);
 } else {
-    safeBootPlanningPage('immediate');
+    bootPlanningPage();
 }
-window.addEventListener('load', () => safeBootPlanningPage('window-load'));
-document.addEventListener('turbo:load', () => safeBootPlanningPage('turbo-load'));
+window.addEventListener('load', bootPlanningPage);
+document.addEventListener('turbo:load', bootPlanningPage);

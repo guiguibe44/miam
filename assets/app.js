@@ -7,10 +7,6 @@ import './stimulus_bootstrap.js';
  */
 import './styles/app.css';
 
-window.__miamAppLoaded = true;
-document.documentElement.setAttribute('data-miam-app-loaded', '1');
-console.log('[app] app.js charge');
-
 /**
  * Avec Turbo Drive, la première import map de la visite reste celle du navigateur :
  * les pages qui ajoutent un second entrypoint (planning, recipe_index) ne chargent pas leur JS
@@ -18,15 +14,9 @@ console.log('[app] app.js charge');
  */
 function loadPageEntrypoints() {
     if (document.querySelector('.planning-page')) {
-        import('planning')
-            .then(() => {
-                console.log('[app] entrypoint planning charge');
-                document.documentElement.setAttribute('data-miam-planning-imported', '1');
-            })
-            .catch((error) => {
-                console.error('[app] Impossible de charger entrypoint "planning"', error);
-                document.documentElement.setAttribute('data-miam-planning-imported', 'error');
-            });
+        import('planning').catch((error) => {
+            console.error('[app] Impossible de charger entrypoint "planning"', error);
+        });
     }
     if (document.querySelector('[data-recipe-list-app]')) {
         import('recipe_index').catch((error) => {
